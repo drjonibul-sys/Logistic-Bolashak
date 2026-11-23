@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Электровозы · Логистика гор. −480</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%231f6fb5'/%3E%3Cpath d='M3 11h10M5 11V6h6v5' stroke='white' fill='none' stroke-width='1.5'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1f6fb5">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Логистика">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+</head>
+<body data-page="locos">
+<main id="page">
+<h1>Электровозы: гор. −480</h1>
+<p class="lead">Имитация движения составов Ferrit по гор. −480. Длина пути берётся из справочника выработок блока −480 на странице <a href="calc.html">«Общий расчёт»</a> (сумма плеч), остальные параметры из <a href="reference.html">справочника параметров</a>. Результат сохраняется и доступен на страницах «Анимация», «Показатели» и «Графики».</p>
+
+<section class="card" id="armCard"></section>
+
+<section class="card" id="flowCard"></section>
+
+<section class="card">
+  <div class="row">
+    <label>Режим
+      <select id="mode">
+        <option value="deterministic">Детерминированный</option>
+        <option value="stochastic" disabled>Стохастический (версия 0.4)</option>
+      </select>
+    </label>
+    <label>Горизонт
+      <select id="kind">
+        <option value="shift">Смена (10,2 ч)</option>
+        <option value="day">Сутки (24 ч)</option>
+      </select>
+    </label>
+    <button id="btnRun" class="btn primary" type="button">Рассчитать</button>
+    <span id="runMsg" class="msg" role="status"></span>
+  </div>
+  <p class="hint">Смена: окно работы электровозов [t<sub>ТО</sub>, t<sub>ТО</sub> + T<sub>эф</sub>], T<sub>эф</sub> = (T<sub>см</sub> − t<sub>ТО,нач</sub> − t<sub>ТО,кон</sub>)·КТГ. Сутки: две смены и технологический перерыв между ними.</p>
+</section>
+
+<div id="resBox" hidden>
+  <h2 class="sec">Результат</h2>
+  <div class="tiles" id="tiles"></div>
+  <section class="card"><h3>Главное</h3><ul class="plain" id="findings"></ul></section>
+  <section class="card"><h3>Проверки</h3><div class="scroll"><table id="checks"></table></div></section>
+  <p class="row">
+    <a class="btn primary" href="animation.html">Смотреть анимацию</a>
+    <a class="btn" href="kpi.html">Показатели</a>
+    <a class="btn" href="charts.html">Графики</a>
+  </p>
+</div>
+<div id="resEmpty" class="empty" hidden><p>Расчёт ещё не выполнялся. Нажмите «Рассчитать».</p></div>
+</main>
+<script src="js/blocks.js"></script>
+<script src="js/drive.js"></script>
+<script src="js/params-data.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/local-api.js"></script>
+<script src="js/pwa.js"></script>
+<script src="js/updater.js"></script>
+<script src="js/common.js"></script>
+<script src="js/p-locos.js"></script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Графики · Логистика гор. −480</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%231f6fb5'/%3E%3Cpath d='M3 11h10M5 11V6h6v5' stroke='white' fill='none' stroke-width='1.5'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="charts">
+<main id="page">
+<h1>Графики</h1>
+<p class="lead">Накопленный выпуск против плана, очереди, диаграмма Ганта по электровозам, загрузка ресурсов и потери на ожидание.</p>
+<div id="chEmpty" class="empty" hidden><p>Нет результата расчёта.</p><a class="btn primary" href="locos.html">Перейти к расчёту</a></div>
+<div id="chBox" hidden>
+  <h3>Накопленный выпуск и план</h3><canvas id="cvTonnes" class="cv"></canvas>
+  <h3>Очереди у постов, ПДМ и КДРВ</h3><canvas id="cvQueue" class="cv"></canvas>
+  <h3>Состояния электровозов (диаграмма Ганта)</h3><canvas id="cvGantt" class="cv"></canvas>
+  <div id="legend2" class="legend"></div>
+  <h3>Загрузка ресурсов в окнах работы</h3><canvas id="cvUtil" class="cv"></canvas>
+  <h3>Потери времени на ожидание по причинам, мин</h3><canvas id="cvWait" class="cv"></canvas>
+</div>
+</main>
+<script src="js/blocks.js"></script>
+<script src="js/common.js"></script>
+<script src="js/draw.js"></script>
+<script src="js/p-charts.js"></script>
+</body>
+</html>

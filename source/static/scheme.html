@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Схема · Логистика гор. −480</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%231f6fb5'/%3E%3Cpath d='M3 11h10M5 11V6h6v5' stroke='white' fill='none' stroke-width='1.5'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="scheme">
+<main id="page">
+<h1>Схема и пропускная способность</h1>
+<p class="lead">Маршрут «посты погрузки → КДРВ №2», расчётные величины по текущему справочнику и оценка пропускной способности звеньев без прогона имитации.</p>
+<div class="card">
+  <canvas id="cvScheme" class="cv" aria-label="Схема маршрута"></canvas>
+  <p class="hint" id="schemeNote"></p>
+</div>
+<div class="cards">
+  <section class="card"><h3>Узлы маршрута</h3><div class="scroll"><table id="tblNodes"></table></div></section>
+  <section class="card"><h3>Расчётные величины</h3><div class="scroll"><table id="tblCalc"></table></div></section>
+</div>
+<section class="card">
+  <h3>Пропускная способность звеньев (для изолированного движения, без имитации)</h3>
+  <div class="scroll"><table id="tblCap"></table></div>
+  <p id="capText"></p>
+  <p class="hint">Ориентир не учитывает пуск первого цикла, ожидания у блок-участков и взаимное влияние звеньев, поэтому имитация обычно даёт на 1–2 состава меньше. Больше ориентира имитация может дать только на составы, которые дозагружаются на постах после конца окна работы (до числа постов). Формулы: <a href="help.html#capacity">справка, раздел «Пропускная способность»</a>.</p>
+</section>
+</main>
+<script src="js/blocks.js"></script>
+<script src="js/common.js"></script>
+<script src="js/draw.js"></script>
+<script src="js/p-scheme.js"></script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Обзор · Логистика гор. −480</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%231f6fb5'/%3E%3Cpath d='M3 11h10M5 11V6h6v5' stroke='white' fill='none' stroke-width='1.5'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="index">
+<main id="page">
+<h1>Обзор</h1>
+<p class="lead">Логистика транспортировки горной массы шахты «Болашак»: три блока (гор. −480 с электровозами, АТУ, гор. −402 с ПДМ и самосвалами). Расчёты вынесены на три страницы, плечи и названия выработок правятся в справочнике на странице «Общий расчёт». Границы версии перечислены внизу страницы.</p>
+
+<section class="card" id="lastCard" aria-live="polite"></section>
+
+<div class="cards">
+  <section class="card" id="bnCard"></section>
+  <section class="card" id="paramCard"></section>
+</div>
+
+<section class="card" id="devCard" hidden></section>
+
+<h2 class="sec">Разделы</h2>
+<div class="sitemap" id="sitemap"></div>
+
+<h2 class="sec">Границы этой версии</h2>
+<ul class="plain">
+  <li>Груз в камерах не ограничен: подвоз с С-1 считается аналитически (звено цепочки, без очередей и объёмов карманов), поэтому выпуск выше 100 % плана не оценка факта.</li>
+  <li>Путевая схема условная: цепочка равных блок-участков с одинаковыми разминовками (данные A10 ждут от шахты).</li>
+  <li>Длины электровоза, вагона и тормозной путь взяты по допущению (A11); допущения помечены в справочнике.</li>
+  <li>Стохастический режим, отказы, электровозы К-14 и бетон появятся в следующих версиях.</li>
+</ul>
+</main>
+<script src="js/blocks.js"></script>
+<script src="js/common.js"></script>
+<script src="js/p-index.js"></script>
+</body>
+</html>

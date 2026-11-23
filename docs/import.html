@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Импорт · Логистика гор. −480</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%231f6fb5'/%3E%3Cpath d='M3 11h10M5 11V6h6v5' stroke='white' fill='none' stroke-width='1.5'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1f6fb5">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Логистика">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+</head>
+<body data-page="import">
+<main id="page">
+<h1>Импорт данных</h1>
+<p class="lead">Загрузка топологии из DXF маркшейдерского плана и справочников из Excel. Раздел готовится к версии 0.2; в версии 0.1 параметры вводит администратор на странице «Справочник».</p>
+<div id="gate" class="empty"><p>Раздел доступен администратору.</p><button class="btn primary gate-btn" type="button">Войти как администратор</button></div>
+<div id="content" hidden>
+  <div class="banner warn">Загрузка пока не работает: кнопки ниже выключены. Ниже описано, что будет импортироваться и какие данные для этого нужны.</div>
+  <div class="cards">
+    <section class="card">
+      <h3>Топология из DXF</h3>
+      <p>Рабочий план гор. −480: выработки, узлы, разминовки, пикетаж. Из плана будет построен граф маршрута вместо условной цепочки блок-участков.</p>
+      <ul class="plain">
+        <li>Разбор уже выполнен вручную для файла «Рабочий_план_-480_25_06_2026.dxf»: 24 именованных участка и 40 узлов (проект, папка dxf_horizon480).</li>
+        <li>Нужно от шахты: путевая схема гор. −480 с рельсовыми путями, разминовками и их длинами (открытый вопрос A10).</li>
+      </ul>
+      <div class="row"><input type="file" accept=".dxf" disabled aria-label="Файл DXF"><button class="btn" type="button" disabled>Загрузить DXF</button></div>
+    </section>
+    <section class="card">
+      <h3>Справочники из Excel</h3>
+      <p>Шаблон книги Excel с листами «Параметры», «Участки», «Узлы». Значения проверяются так же, как при ручном вводе (пределы, целые числа).</p>
+      <ul class="plain">
+        <li>Нужно от шахты: шаблон или образец таблиц, которыми шахта привыкла пользоваться (открытый вопрос E7).</li>
+        <li>До выхода импорта правка выполняется на странице «Справочник».</li>
+      </ul>
+      <div class="row"><input type="file" accept=".xlsx" disabled aria-label="Файл Excel"><button class="btn" type="button" disabled>Загрузить Excel</button></div>
+    </section>
+  </div>
+</div>
+</main>
+<script src="js/blocks.js"></script>
+<script src="js/params-data.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/local-api.js"></script>
+<script src="js/pwa.js"></script>
+<script src="js/updater.js"></script>
+<script src="js/common.js"></script>
+<script src="js/p-import.js"></script>
+</body>
+</html>

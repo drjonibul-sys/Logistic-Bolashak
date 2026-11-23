@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Источник обновлений · Логистика гор. −480</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%231f6fb5'/%3E%3Cpath d='M3 11h10M5 11V6h6v5' stroke='white' fill='none' stroke-width='1.5'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="update-source">
+<main id="page">
+<h1>Источник обновлений</h1>
+<div class="tabs" role="tablist">
+  <a class="tab" href="updates.html">Проверка</a>
+  <a class="tab on" href="update-source.html" aria-current="page">Источник</a>
+</div>
+<p class="lead">Сайт, на котором лежит новая версия приложения. По умолчанию это сайт репозитория проекта (GitHub Pages, ветка main, папка docs). Можно указать другой сайт вручную.</p>
+
+<section class="card">
+  <h3>Адрес источника</h3>
+  <label class="inline"><input type="radio" name="srcMode" value="auto" id="srcAuto"> По умолчанию: репозиторий проекта на GitHub</label>
+  <p class="mono" id="autoUrl"></p>
+  <label class="inline"><input type="radio" name="srcMode" value="manual" id="srcManual"> Указать вручную</label>
+  <p><input type="text" id="srcUrl" class="wide" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="https://имя.github.io/logistika/" aria-label="Адрес сайта-источника"></p>
+  <p class="row"><button class="btn primary" id="btnSave" type="button">Сохранить</button>
+  <button class="btn" id="btnTest" type="button">Проверить источник</button>
+  <button class="btn" id="btnReset" type="button">Вернуть адрес репозитория</button></p>
+  <p class="msg" id="srcMsg" role="status"></p>
+  <p class="hint">Адрес сайта вводят вместе с папкой, где лежат index.html и version.json. Приставка https:// добавится сама. Окончание index.html и параметры после знака ? убираются.</p>
+</section>
+
+<section class="card">
+  <h3>Проверка при запуске</h3>
+  <label class="inline"><input type="checkbox" id="autoChk"> Проверять обновление при открытии приложения (не чаще раза в 6 часов)</label>
+  <p class="hint">Если найдена новая версия, наверху страницы появится заметка со ссылкой на раздел «Обновления». Без сети проверка пропускается.</p>
+</section>
+
+<section class="card">
+  <h3>Требования к источнику</h3>
+  <ul class="plain">
+    <li>Адрес начинается с https://. Исключение: localhost и локальная сеть (http://192.168…).</li>
+    <li>В папке источника лежат version.json и запасной version.js. Оба файла создаёт сборка вместе с остальным приложением.</li>
+    <li>Бесплатные хостинги (GitHub Pages, Cloudflare Pages, Netlify) отдают version.json с разрешением чтения, поэтому проверка проходит и с другого адреса.</li>
+    <li>Хранилище браузера привязано к адресу сайта. При переходе на другой адрес справочник и расчёты не переносятся сами: используйте «Сохранить копию данных» и «Восстановить из копии» в «Настройках».</li>
+  </ul>
+</section>
+
+</main>
+<script src="js/blocks.js"></script>
+<script src="js/updater.js"></script>
+<script src="js/common.js"></script>
+<script src="js/p-update-source.js"></script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Администрирование · Логистика гор. −480</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%231f6fb5'/%3E%3Cpath d='M3 11h10M5 11V6h6v5' stroke='white' fill='none' stroke-width='1.5'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1f6fb5">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Логистика">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+</head>
+<body data-page="admin">
+<main id="page">
+<h1>Администрирование</h1>
+<p class="lead" id="adminLead">Пароль администратора, расположение данных на диске и защита входа. Приложение работает только на этом компьютере.</p>
+<div id="gate" class="empty"><p>Раздел доступен администратору.</p><button class="btn primary gate-btn" type="button">Войти как администратор</button></div>
+<div id="content" hidden>
+  <div class="cards">
+    <section class="card">
+      <h3>Сменить пароль</h3>
+      <form id="formPw" class="pwform" autocomplete="off">
+        <label>Текущий пароль <input type="password" id="pwOld" autocomplete="current-password" maxlength="128"></label>
+        <label>Новый пароль <input type="password" id="pwNew" autocomplete="new-password" maxlength="128"></label>
+        <label>Повторите новый пароль <input type="password" id="pwNew2" autocomplete="new-password" maxlength="128"></label>
+        <p id="pwErr" class="msg" role="alert"></p>
+        <button type="submit" class="btn primary">Сменить пароль</button>
+      </form>
+      <p class="hint">Пароль не короче 12 символов. После смены другие сеансы администратора закрываются.</p>
+    </section>
+    <section class="card">
+      <h3>Справочник параметров</h3>
+      <p>Вернуть все параметры к значениям по умолчанию (изменения администратора будут удалены).</p>
+      <button id="btnReset" class="btn danger" type="button">Вернуть значения по умолчанию</button>
+      <p id="resetMsg" class="msg" role="status"></p>
+    </section>
+  </div>
+  <section class="card" id="cardMove" hidden>
+    <h3>Перенос справочника</h3>
+    <p>Значения справочника хранятся в этом браузере. Чтобы сохранить копию или перенести их на другой компьютер, нажмите «Показать текущие значения» и скопируйте текст. Чтобы загрузить, вставьте текст и нажмите «Загрузить».</p>
+    <textarea id="moveText" rows="7" spellcheck="false" aria-label="Значения справочника в формате JSON"></textarea>
+    <p class="row"><button id="btnMoveShow" class="btn" type="button">Показать текущие значения</button>
+    <button id="btnMoveLoad" class="btn primary" type="button">Загрузить значения из текста</button></p>
+    <p id="moveMsg" class="msg" role="status"></p>
+  </section>
+  <section class="card">
+    <h3>Состояние приложения</h3>
+    <div class="scroll"><table id="tblInfo"></table></div>
+    <p class="hint" id="infoHint">Резервная копия: закройте программу и скопируйте папку данных. Забытый пароль: удалите файл admin.json в папке данных и задайте пароль заново.</p>
+  </section>
+</div>
+</main>
+<script src="js/blocks.js"></script>
+<script src="js/params-data.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/local-api.js"></script>
+<script src="js/pwa.js"></script>
+<script src="js/updater.js"></script>
+<script src="js/common.js"></script>
+<script src="js/p-admin.js"></script>
+</body>
+</html>

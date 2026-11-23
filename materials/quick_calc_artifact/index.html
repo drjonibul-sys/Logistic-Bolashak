@@ -1,0 +1,2923 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Быстрый расчёт гор. −480</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+/* Палитра: сталь и сигнальный янтарь (маркировка выработок). Схема: слева панель параметров, справа итог сверху вниз. */
+:root {
+  --bg: #eef1f4; --panel: #ffffff; --ink: #17212b; --muted: #566472; --line: #d5dce3;
+  --accent: #0b5d8a; --accent-soft: #e1eef6;
+  --ok: #1b7a4b; --ok-bg: #e3f3ea; --warn: #9a5b00; --warn-bg: #fff2d6; --bad: #b3261e; --bad-bg: #fbe5e3;
+  --font: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #11171d; --panel: #1a232c; --ink: #e6ecf1; --muted: #9aa8b5; --line: #2c3945;
+  --accent: #62b3e3; --accent-soft: #1d3342;
+  --ok: #5ccf92; --ok-bg: #173226; --warn: #f0b24d; --warn-bg: #3a2d12; --bad: #ff8a80; --bad-bg: #3b1d1b; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #11171d; --panel: #1a232c; --ink: #e6ecf1; --muted: #9aa8b5; --line: #2c3945;
+  --accent: #62b3e3; --accent-soft: #1d3342;
+  --ok: #5ccf92; --ok-bg: #173226; --warn: #f0b24d; --warn-bg: #3a2d12; --bad: #ff8a80; --bad-bg: #3b1d1b; color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--font); }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 20px 16px 48px; }
+header.top { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; justify-content: space-between; margin-bottom: 16px; }
+h1 { font-size: 24px; line-height: 1.2; margin: 0; text-wrap: balance; }
+.sub { color: var(--muted); font-size: 13.5px; }
+.badge-prev { font: 500 12px var(--mono); background: var(--warn-bg); color: var(--warn); padding: 3px 8px; border-radius: 99px; }
+.grid { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 880px) { .grid { grid-template-columns: minmax(0, 1fr); } .side { position: static !important; max-height: none !important; } }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+.card + .card, .stack > .card + .card { margin-top: 16px; }
+.stack, .card { min-width: 0; }
+.side { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow: auto; }
+h2 { font-size: 16px; margin: 0 0 12px; text-wrap: balance; }
+h3 { font-size: 14px; margin: 16px 0 8px; }
+.f { display: grid; grid-template-columns: 1fr 96px; gap: 2px 8px; align-items: center; margin-bottom: 10px; }
+.f label { font-size: 13.5px; }
+.f input, .f select { font: 500 14px var(--mono); width: 100%; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); text-align: right; }
+.f input:focus-visible, .f select:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.f input.chg { border-color: var(--accent); background: var(--accent-soft); }
+.f input.err { border-color: var(--bad); }
+.f .meta { grid-column: 1 / -1; display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--muted); min-height: 16px; }
+.tag { font-size: 11px; padding: 0 6px; border-radius: 99px; border: 1px solid var(--line); white-space: nowrap; }
+.tag.d { color: var(--ok); border-color: var(--ok); } .tag.a { color: var(--warn); border-color: var(--warn); } .tag.p { color: var(--accent); border-color: var(--accent); }
+.errt { color: var(--bad); }
+.btnrow { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+button { font: 500 13.5px var(--font); padding: 7px 12px; border-radius: 7px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+details > summary { cursor: pointer; font-weight: 500; padding: 6px 0; }
+details.box { border: 1px solid var(--line); border-radius: 8px; padding: 0 12px; margin-top: 12px; }
+details.box[open] { padding-bottom: 12px; }
+.verdict { display: grid; gap: 14px; }
+.vhead { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.pill { font-weight: 600; padding: 4px 12px; border-radius: 99px; font-size: 14px; }
+.pill.ok { background: var(--ok-bg); color: var(--ok); } .pill.warn { background: var(--warn-bg); color: var(--warn); } .pill.bad { background: var(--bad-bg); color: var(--bad); }
+.vtext { font-size: 15.5px; margin: 0; max-width: 70ch; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.tile { border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.tile.ok { border-left-color: var(--ok); } .tile.warn { border-left-color: var(--warn); } .tile.bad { border-left-color: var(--bad); }
+.tile .v { font: 500 22px var(--mono); font-variant-numeric: tabular-nums; }
+.tile .l { font-size: 12.5px; color: var(--muted); }
+.delta { font: 500 12px var(--mono); color: var(--muted); }
+.delta.up { color: var(--ok); } .delta.dn { color: var(--bad); }
+.bars { display: grid; gap: 10px; }
+.bar { display: grid; grid-template-columns: minmax(130px, 220px) 1fr 120px; gap: 10px; align-items: center; font-size: 13.5px; }
+@media (max-width: 600px) { .bar { grid-template-columns: 1fr; gap: 3px; } }
+.track { position: relative; height: 18px; background: var(--bg); border-radius: 4px; }
+.fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; background: var(--accent); }
+.bar.hot .fill { background: var(--bad); } .bar.hot .nm { font-weight: 600; color: var(--bad); }
+.need { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); }
+.val { font: 500 13px var(--mono); text-align: right; font-variant-numeric: tabular-nums; }
+.legend { font-size: 12.5px; color: var(--muted); margin-top: 8px; }
+.cyc { display: flex; height: 26px; border-radius: 5px; overflow: hidden; margin: 8px 0; }
+.cyc span { display: block; height: 100%; }
+.cl { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--muted); }
+.cl i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+th, td { padding: 7px 8px; border-bottom: 1px solid var(--line); text-align: right; vertical-align: top; }
+th { font-weight: 600; color: var(--muted); font-size: 12.5px; }
+th:first-child, td:first-child, td.l, th.l { text-align: left; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+tr.best td { background: var(--ok-bg); }
+.scroll { overflow-x: auto; }
+.mini { height: 8px; background: var(--bg); border-radius: 3px; position: relative; min-width: 120px; }
+.mini b { position: absolute; top: 0; bottom: 0; border-radius: 3px; }
+ul.plain { margin: 6px 0 0; padding-left: 18px; } ul.plain li { margin: 3px 0; }
+textarea { width: 100%; min-height: 220px; font: 13px/1.45 var(--mono); background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+svg text { fill: var(--ink); font: 11px var(--font); }
+.note { font-size: 12.5px; color: var(--muted); }
+.warnbox { background: var(--warn-bg); color: var(--warn); border-radius: 8px; padding: 8px 12px; font-size: 13.5px; }
+@media (prefers-reduced-motion: no-preference) { .fill, .mini b { transition: width .2s; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <div>
+    <h1>Быстрый расчёт гор. −480</h1>
+    <div class="sub">Электровозы Ferrit, погрузка С-14 и С-15, разгрузка КДРВ №2. Расчёт идёт сам при каждой правке.</div>
+  </div>
+  <span class="badge-prev">вариант для согласования</span>
+</header>
+
+<div class="grid">
+  <aside class="side card" aria-label="Параметры">
+    <h2>Параметры</h2>
+    <div class="f"><label for="kind">Горизонт</label>
+      <select id="kind"><option value="shift">Смена, 10,2 ч</option><option value="day">Сутки, 2 смены</option></select></div>
+    <div id="primary"></div>
+    <details class="box" id="secWrap"><summary>Ещё параметры цикла</summary><div id="secondary"></div></details>
+    <div class="btnrow">
+      <button id="btnBase" type="button">Зафиксировать как базу</button>
+      <button id="btnReset" type="button">К данным шахты</button>
+    </div>
+    <p class="note" id="baseNote"></p>
+    <p class="note">Метки: <span class="tag d">шахта</span> данные шахты, <span class="tag p">норматив</span> раздел модели, <span class="tag a">допущение</span> нужно подтвердить.</p>
+  </aside>
+
+  <main class="stack">
+    <section class="card verdict" id="verdict" aria-live="polite"></section>
+    <section class="card"><h2>Узкое место</h2><div id="bottleneck"></div></section>
+    <section class="card"><h2>Что даст изменение</h2><div id="whatif"></div></section>
+    <section class="card"><h2>Допущения и их влияние</h2><div id="assume"></div></section>
+    <section class="card"><h2>Маршрут по узлам</h2><div id="route"></div></section>
+    <section class="card"><h2>Отчёт</h2>
+      <p class="note" style="margin-top:0">Сводка одним текстом: параметры, итог, узкое место, допущения.</p>
+      <div class="btnrow" style="margin:0 0 10px"><button class="primary" id="btnCopy" type="button">Скопировать отчёт</button><span class="note" id="copyMsg"></span></div>
+      <textarea id="report" readonly aria-label="Текст отчёта"></textarea></section>
+    <section class="card"><h2>Что изменилось по сравнению с прежней версией</h2><div id="about"></div></section>
+  </main>
+</div>
+</div>
+
+<script>'use strict';
+/* Создан tools/gen_params_js.py из sim/params.py, не править вручную. */
+var LG_VERSION = "0.11.1";
+var LG_GROUPS = [
+ {
+  "title": "Локомотивы и составы (Ferrit LF120, ВДР-5,3)",
+  "items": [
+   {
+    "key": "n_loco",
+    "label": "Число электровозов Ferrit в работе",
+    "unit": "шт",
+    "value": 7,
+    "min": 1,
+    "max": 30,
+    "int": true,
+    "note": "данные шахты: 7 ед. (КТГ учитывается окном работы)"
+   },
+   {
+    "key": "n_wagons",
+    "label": "Вагонов ВДР-5,3 в составе",
+    "unit": "шт",
+    "value": 9,
+    "min": 1,
+    "max": 12,
+    "int": true,
+    "note": "данные шахты: до 9 ВДР"
+   },
+   {
+    "key": "m_wag",
+    "label": "Груз в вагоне (один ковш ST1030)",
+    "unit": "т",
+    "value": 10.0,
+    "min": 1,
+    "max": 15,
+    "note": "раздел 10 п.7: один ковш 10 т, допущение N_ков = 1"
+   },
+   {
+    "key": "v_kmh",
+    "label": "Паспортная скорость Ferrit",
+    "unit": "км/ч",
+    "value": 20.0,
+    "min": 3,
+    "max": 40,
+    "note": "данные шахты: максимум 20 км/ч"
+   },
+   {
+    "key": "k_v",
+    "label": "Доля паспортной скорости k_v",
+    "unit": "",
+    "value": 0.7,
+    "min": 0.2,
+    "max": 1.0,
+    "note": "допущение: фактических скоростей нет, 14 км/ч"
+   },
+   {
+    "key": "a",
+    "label": "Ускорение при трогании a",
+    "unit": "м/с²",
+    "value": 0.146,
+    "min": 0.03,
+    "max": 1.0,
+    "note": "раздел 4: 55 кН, M = 190 т, w₀ + i = 13 ‰ (верхняя граница)"
+   },
+   {
+    "key": "b",
+    "label": "Замедление при торможении b",
+    "unit": "м/с²",
+    "value": 0.5,
+    "min": 0.1,
+    "max": 1.5,
+    "note": "допущение, нормативы тормозного пути уточнить (A11)"
+   },
+   {
+    "key": "L_loco",
+    "label": "Длина электровоза L_лок",
+    "unit": "м",
+    "value": 7.0,
+    "min": 3,
+    "max": 15,
+    "note": "допущение (A11)"
+   },
+   {
+    "key": "L_wag",
+    "label": "Длина вагона ВДР L_в",
+    "unit": "м",
+    "value": 6.0,
+    "min": 3,
+    "max": 12,
+    "note": "допущение (A11); с L_ст = 14 м даёт 75 м из раздела 13.3"
+   },
+   {
+    "key": "L_zap",
+    "label": "Запас на остановку L_зап",
+    "unit": "м",
+    "value": 10.0,
+    "min": 0,
+    "max": 50,
+    "note": "допущение"
+   },
+   {
+    "key": "F_k",
+    "label": "Реализуемая сила тяги Ferrit F_к",
+    "unit": "кН",
+    "value": 52.25,
+    "min": 5,
+    "max": 120,
+    "note": "55 кН · 0,95 (нижняя граница допуска ±5 %), раздел 2 formulas_and_defaults.md"
+   },
+   {
+    "key": "P_loco",
+    "label": "Масса электровоза Ferrit",
+    "unit": "т",
+    "value": 35.0,
+    "min": 5,
+    "max": 80,
+    "note": "допущение (A11), масса не известна"
+   },
+   {
+    "key": "m_tare",
+    "label": "Масса порожнего вагона",
+    "unit": "т",
+    "value": 6.0,
+    "min": 1,
+    "max": 15,
+    "note": "допущение, подтвердить"
+   },
+   {
+    "key": "w0",
+    "label": "Удельное сопротивление движению w₀",
+    "unit": "‰",
+    "value": 8.0,
+    "min": 1,
+    "max": 30,
+    "note": "допущение, нужен хронометраж рейсов"
+   }
+  ]
+ },
+ {
+  "title": "Маршрут: пост погрузки → КДРВ №2",
+  "items": [
+   {
+    "key": "L_path",
+    "label": "Длина пути пост → КДРВ №2",
+    "unit": "м",
+    "value": 2400.0,
+    "min": 100,
+    "max": 10000,
+    "note": "задаётся суммой плеч блока −480 в справочнике выработок (раздел «Выработки и плечи»); здесь только просмотр. Раздел 13.6: 2,2–2,6 км, нужен пикетаж (A10)"
+   },
+   {
+    "key": "n_blocks",
+    "label": "Число блок-участков",
+    "unit": "шт",
+    "value": 6,
+    "min": 1,
+    "max": 20,
+    "int": true,
+    "note": "допущение, определить по путевой схеме (A10)"
+   },
+   {
+    "key": "L_razm",
+    "label": "Длина разминовки L_разм",
+    "unit": "м",
+    "value": 150.0,
+    "min": 20,
+    "max": 500,
+    "note": "допущение (A10); ёмкость k_р = ⌊L_разм/(L_п + L_зап)⌋"
+   }
+  ]
+ },
+ {
+  "title": "Погрузка (ПДМ ST1030 №2, камеры С-14 и С-15)",
+  "items": [
+   {
+    "key": "n_posts",
+    "label": "Постов погрузки (С-14, С-15)",
+    "unit": "шт",
+    "value": 2,
+    "min": 1,
+    "max": 4,
+    "int": true,
+    "note": "данные шахты: камеры С-14 и С-15"
+   },
+   {
+    "key": "n_loader",
+    "label": "ПДМ на погрузке",
+    "unit": "шт",
+    "value": 1,
+    "min": 1,
+    "max": 3,
+    "int": true,
+    "note": "ST1030 №2, один на все посты"
+   },
+   {
+    "key": "t_post",
+    "label": "Постановка состава под погрузку",
+    "unit": "с",
+    "value": 120.0,
+    "min": 0,
+    "max": 1800,
+    "note": "раздел 10 п.7: 2 мин"
+   },
+   {
+    "key": "t_podacha",
+    "label": "Подача вагона локомотивом",
+    "unit": "с",
+    "value": 60.0,
+    "min": 0,
+    "max": 600,
+    "note": "раздел 10 п.7: 1,0 мин"
+   },
+   {
+    "key": "t_pdm",
+    "label": "Цикл ПДМ на один вагон",
+    "unit": "с",
+    "value": 88.2,
+    "min": 10,
+    "max": 600,
+    "note": "раздел 10 п.7: 1,47 мин при плече 15 м"
+   }
+  ]
+ },
+ {
+  "title": "Разгрузка (КДРВ №2)",
+  "items": [
+   {
+    "key": "t_unload",
+    "label": "Разгрузка состава на КДРВ",
+    "unit": "с",
+    "value": 90.0,
+    "min": 10,
+    "max": 900,
+    "note": "данные шахты: 9 ВДР за 1,5 мин (уточнить хронометражем)"
+   }
+  ]
+ },
+ {
+  "title": "СГШО: самосвалы MT436, ПДМ ST14 и ST1030 (гор. −402, АТУ, С-1)",
+  "items": [
+   {
+    "key": "n_truck",
+    "label": "Автосамосвалов MT436 в работе",
+    "unit": "шт",
+    "value": 2,
+    "min": 1,
+    "max": 10,
+    "int": true,
+    "note": "данные шахты: 2 ед."
+   },
+   {
+    "key": "G_truck",
+    "label": "Грузоподъёмность самосвала",
+    "unit": "т",
+    "value": 30.0,
+    "min": 10,
+    "max": 50,
+    "note": "данные шахты: 30 т (паспорт MT436B 32,65 т)"
+   },
+   {
+    "key": "delta",
+    "label": "Допустимый перегруз самосвала δ",
+    "unit": "",
+    "value": 0.05,
+    "min": 0,
+    "max": 0.3,
+    "note": "допущение; число ковшей n = ⌊G(1 + δ)/q⌋"
+   },
+   {
+    "key": "n_st14",
+    "label": "ПДМ ST14 на погрузке руды в −402",
+    "unit": "шт",
+    "value": 2,
+    "min": 1,
+    "max": 4,
+    "int": true,
+    "note": "данные шахты: обе ST14 на руде −402"
+   },
+   {
+    "key": "V_bucket",
+    "label": "Ковш ST14",
+    "unit": "м³",
+    "value": 6.4,
+    "min": 3,
+    "max": 10,
+    "note": "допущение: установленный типоразмер 4,7–7,8 м³ подтвердить"
+   },
+   {
+    "key": "k_fill",
+    "label": "Коэффициент наполнения ковша",
+    "unit": "",
+    "value": 0.9,
+    "min": 0.5,
+    "max": 1.2,
+    "note": "допущение"
+   },
+   {
+    "key": "gamma_ore",
+    "label": "Плотность руды разрыхлённой",
+    "unit": "т/м³",
+    "value": 2.31,
+    "min": 1,
+    "max": 4,
+    "note": "данные шахты: 3,7 т/м³ в массиве, kр = 1,6"
+   },
+   {
+    "key": "t_chern",
+    "label": "Черпание ковша",
+    "unit": "с",
+    "value": 15.0,
+    "min": 0,
+    "max": 120,
+    "note": "допущение"
+   },
+   {
+    "key": "t_man",
+    "label": "Манёвры ПДМ на цикл",
+    "unit": "с",
+    "value": 30.0,
+    "min": 0,
+    "max": 180,
+    "note": "допущение"
+   },
+   {
+    "key": "t_pod",
+    "label": "Подъём, разгрузка и опускание ковша ST14",
+    "unit": "с",
+    "value": 14.6,
+    "min": 5,
+    "max": 60,
+    "note": "паспорт Epiroc: 7,6 + 3,0 + 4,0 с"
+   },
+   {
+    "key": "t_pod1030",
+    "label": "Подъём, разгрузка и опускание ковша ST1030",
+    "unit": "с",
+    "value": 16.1,
+    "min": 5,
+    "max": 60,
+    "note": "паспорт Epiroc: 8,0 + 2,1 + 6,0 с"
+   },
+   {
+    "key": "v_pdm_g",
+    "label": "Скорость ПДМ гружёной",
+    "unit": "км/ч",
+    "value": 8.0,
+    "min": 2,
+    "max": 25,
+    "note": "допущение (C7)"
+   },
+   {
+    "key": "v_pdm_p",
+    "label": "Скорость ПДМ порожней",
+    "unit": "км/ч",
+    "value": 10.0,
+    "min": 2,
+    "max": 30,
+    "note": "допущение (C7)"
+   },
+   {
+    "key": "t_truck_pos",
+    "label": "Постановка самосвала под погрузку и разгрузку (сумма)",
+    "unit": "с",
+    "value": 60.0,
+    "min": 0,
+    "max": 600,
+    "note": "допущение"
+   },
+   {
+    "key": "t_zap_truck",
+    "label": "Время освобождения участка самосвалом t_зап",
+    "unit": "с",
+    "value": 10.0,
+    "min": 0,
+    "max": 120,
+    "note": "допущение: в формуле однополосного блок-участка N = 3600/(t_г + t_п + 2·t_зап)"
+   },
+   {
+    "key": "t_truck_dump",
+    "label": "Разгрузка самосвала",
+    "unit": "с",
+    "value": 14.0,
+    "min": 5,
+    "max": 120,
+    "note": "паспорт MT436: 14 с"
+   },
+   {
+    "key": "ktg_sg",
+    "label": "КТГ СГШО",
+    "unit": "",
+    "value": 0.85,
+    "min": 0.1,
+    "max": 1.0,
+    "note": "данные шахты: 0,85"
+   },
+   {
+    "key": "plan_402",
+    "label": "План руды гор. −402 в смену",
+    "unit": "т",
+    "value": 1200.0,
+    "min": 0,
+    "max": 20000,
+    "note": "данные шахты: 1200 т в смену"
+   }
+  ]
+ },
+ {
+  "title": "Проходка: геометрия, торкрет, анкеры, горная масса",
+  "items": [
+   {
+    "key": "d_S",
+    "label": "Сечение выработки вчерне S",
+    "unit": "м²",
+    "value": 20.0,
+    "min": 5,
+    "max": 60,
+    "note": "допущение: типовая откаточная выработка, уточнить по паспорту крепления"
+   },
+   {
+    "key": "d_b",
+    "label": "Ширина выработки по почве b",
+    "unit": "м",
+    "value": 5.0,
+    "min": 2,
+    "max": 10,
+    "note": "допущение; площадь крепления = (P − b) · l, где P = k_P·√S"
+   },
+   {
+    "key": "d_kP",
+    "label": "Коэффициент периметра k_P",
+    "unit": "",
+    "value": 3.9,
+    "min": 3.5,
+    "max": 4.6,
+    "note": "допущение: арочный профиль P ≈ 3,9·√S"
+   },
+   {
+    "key": "d_gamma",
+    "label": "Плотность породы в массиве γ",
+    "unit": "т/м³",
+    "value": 2.7,
+    "min": 2.0,
+    "max": 4.5,
+    "note": "данные шахты: порода 2,7 т/м³, руда 3,7 т/м³"
+   },
+   {
+    "key": "d_kr",
+    "label": "Коэффициент разрыхления k_р",
+    "unit": "",
+    "value": 1.6,
+    "min": 1.2,
+    "max": 2.0,
+    "note": "данные шахты: 1,6"
+   },
+   {
+    "key": "d_k_per",
+    "label": "Коэффициент перебора сечения k_пер",
+    "unit": "",
+    "value": 1.05,
+    "min": 1.0,
+    "max": 1.3,
+    "note": "допущение; фактические вывалы по плану: см. F9"
+   },
+   {
+    "key": "d_l_sh",
+    "label": "Глубина шпура l_шп",
+    "unit": "м",
+    "value": 3.8,
+    "min": 2.0,
+    "max": 5.0,
+    "note": "допущение: штанга Boomer S2 до 4,3 м, рабочая глубина 3,8 м"
+   },
+   {
+    "key": "d_kish",
+    "label": "Коэффициент использования шпура η",
+    "unit": "",
+    "value": 0.9,
+    "min": 0.6,
+    "max": 1.0,
+    "note": "допущение для крепких ультраосновных пород"
+   },
+   {
+    "key": "d_q",
+    "label": "Удельный расход ВВ q",
+    "unit": "кг/м³",
+    "value": 1.9,
+    "min": 0.5,
+    "max": 4.0,
+    "note": "допущение: f ≈ 10–14, уточнить по паспорту БВР"
+   },
+   {
+    "key": "d_p_vv",
+    "label": "Линейная плотность заряда p",
+    "unit": "кг/м",
+    "value": 1.0,
+    "min": 0.3,
+    "max": 3.0,
+    "note": "допущение: эмульсионное ВВ Ø32 мм"
+   },
+   {
+    "key": "d_k_zap",
+    "label": "Коэффициент заполнения шпура зарядом k_з",
+    "unit": "",
+    "value": 0.7,
+    "min": 0.4,
+    "max": 0.95,
+    "note": "допущение: 0,6–0,75 для контурных и врубовых шпуров"
+   },
+   {
+    "key": "d_V_k4",
+    "label": "Ковш ПДМ №4 подрядчика (уборка породы в забое)",
+    "unit": "м³",
+    "value": 4.6,
+    "min": 1.0,
+    "max": 10.0,
+    "note": "допущение: тип и ковш ПДМ №4 неизвестны (H12), пока принят как у ST1030; скорости и время разгрузки — общие с ПДМ"
+   },
+   {
+    "key": "d_V_k",
+    "label": "Ковш ПДМ ST1030 (подвоз С-1 → карманы)",
+    "unit": "м³",
+    "value": 4.6,
+    "min": 2.0,
+    "max": 8.0,
+    "note": "допущение: типоразмер подтвердить; масса в ковше ограничена 10 т"
+   },
+   {
+    "key": "d_k_fill",
+    "label": "Коэффициент наполнения ковша ПДМ",
+    "unit": "",
+    "value": 0.85,
+    "min": 0.5,
+    "max": 1.2,
+    "note": "допущение"
+   },
+   {
+    "key": "d_L_muck",
+    "label": "Плечо ПДМ: забой → место выгрузки",
+    "unit": "м",
+    "value": 60.0,
+    "min": 5,
+    "max": 500,
+    "note": "допущение; в версии 0.3 привязка к справочнику выработок"
+   },
+   {
+    "key": "d_n_face",
+    "label": "Забоев проходки одновременно",
+    "unit": "шт",
+    "value": 1,
+    "min": 1,
+    "max": 6,
+    "int": true,
+    "note": "допущение; порода всех забоев идёт в откатку (H6)"
+   },
+   {
+    "key": "d_route",
+    "label": "Где идёт проходка: 0 гор. −480, 1 гор. −402 (самосвалы, АТУ, С-1)",
+    "unit": "",
+    "value": 1,
+    "min": 0,
+    "max": 1,
+    "int": true,
+    "note": "допущение: данные шахты: порода −402 идёт самосвалами в С-1, затем ST1030 в С-16 и в ВГ-5,8"
+   },
+   {
+    "key": "d_k_dev",
+    "label": "Коэффициент развития трассы k_изв (плечо по хорде, гор. −480)",
+    "unit": "",
+    "value": 1.3,
+    "min": 1.0,
+    "max": 2.0,
+    "note": "допущение: связного рельсового графа −480 в чертеже нет (A10); плечо = хорда × k_изв"
+   },
+   {
+    "key": "d_share",
+    "label": "Доля породы проходки, уходящая в откатку −480",
+    "unit": "",
+    "value": 1.0,
+    "min": 0,
+    "max": 1,
+    "note": "допущение: остальное в закладку или отвал, не считается"
+   },
+   {
+    "key": "d_V_vg",
+    "label": "Объём вагона ВГ-5,8",
+    "unit": "м³",
+    "value": 5.8,
+    "min": 2,
+    "max": 12,
+    "note": "данные шахты: 5,8 м³"
+   },
+   {
+    "key": "d_k_vg",
+    "label": "Коэффициент наполнения ВГ",
+    "unit": "",
+    "value": 0.85,
+    "min": 0.5,
+    "max": 1.1,
+    "note": "допущение по аналогии с ВДР (0,85)"
+   },
+   {
+    "key": "d_n_vg",
+    "label": "ВГ-5,8 в составе породного состава",
+    "unit": "шт",
+    "value": 9,
+    "min": 1,
+    "max": 12,
+    "int": true,
+    "note": "допущение: как состав ВДР, уточнить (B4)"
+   },
+   {
+    "key": "d_k_reb",
+    "label": "Потери на отскок k_отск",
+    "unit": "",
+    "value": 0.15,
+    "min": 0,
+    "max": 0.4,
+    "note": "допущение: мокрый торкрет 0,10–0,20"
+   },
+   {
+    "key": "d_d1",
+    "label": "Толщина торкрета, слой 1",
+    "unit": "м",
+    "value": 0.05,
+    "min": 0.02,
+    "max": 0.15,
+    "note": "допущение: изолирующий слой до сетки"
+   },
+   {
+    "key": "d_d2",
+    "label": "Толщина торкрета, слой 2",
+    "unit": "м",
+    "value": 0.05,
+    "min": 0.02,
+    "max": 0.15,
+    "note": "допущение: основной слой поверх сетки"
+   },
+   {
+    "key": "d_V_mix",
+    "label": "Вместимость миксера",
+    "unit": "м³",
+    "value": 4.0,
+    "min": 1,
+    "max": 10,
+    "note": "данные шахты: миксеры 4 м³"
+   },
+   {
+    "key": "d_pitch_frame",
+    "label": "Шаг арочных рам (PANTEX)",
+    "unit": "м",
+    "value": 2.0,
+    "min": 0.5,
+    "max": 4.0,
+    "note": "допущение: одна рама на заходку (циклограмма: 1 рама на заходку ≈ 2 м)"
+   },
+   {
+    "key": "d_share_ch",
+    "label": "Доля заряжаемых шпуров от пробуренных",
+    "unit": "",
+    "value": 0.85,
+    "min": 0.5,
+    "max": 1.0,
+    "note": "циклограмма: бурят 65 шпуров, заряжают 55 (≈ 0,85); остальные холостые врубовые"
+   },
+   {
+    "key": "d_cg_T",
+    "label": "Смена по циклограмме (с доставкой людей)",
+    "unit": "мин",
+    "value": 720.0,
+    "min": 360,
+    "max": 840,
+    "note": "циклограмма: две смены по 12 ч (19:00–07:00 и 07:00–19:00)"
+   },
+   {
+    "key": "d_cg_t0",
+    "label": "Начало первой (ночной) смены",
+    "unit": "ч",
+    "value": 19,
+    "min": 0,
+    "max": 23,
+    "int": true,
+    "note": "циклограмма: 19:00; окна ВР в конце каждой смены: 05:00–07:00 и 17:00–19:00"
+   },
+   {
+    "key": "d_cg_win",
+    "label": "Окно ВР в конце смены",
+    "unit": "мин",
+    "value": 120.0,
+    "min": 30,
+    "max": 240,
+    "note": "циклограмма: 2 ч в конце смены"
+   },
+   {
+    "key": "d_t_down",
+    "label": "Спуск смены, доставка людей до рабочего места",
+    "unit": "мин",
+    "value": 75.0,
+    "min": 0,
+    "max": 240,
+    "note": "циклограмма: 75 мин (19:15–20:30)"
+   },
+   {
+    "key": "d_t_safe1",
+    "label": "Приведение рабочего места в безопасное состояние, 1 смена",
+    "unit": "мин",
+    "value": 40.0,
+    "min": 0,
+    "max": 180,
+    "note": "циклограмма: 40 мин (осмотр забоя после ВР, орошение, вентиляция, наращивание рукавов)"
+   },
+   {
+    "key": "d_t_safe2",
+    "label": "Приведение рабочего места в безопасное состояние, 2 смена",
+    "unit": "мин",
+    "value": 20.0,
+    "min": 0,
+    "max": 180,
+    "note": "циклограмма: 20 мин"
+   },
+   {
+    "key": "d_t_out1",
+    "label": "Доставка людей до ствола, вывоз смены, 1 смена",
+    "unit": "мин",
+    "value": 120.0,
+    "min": 0,
+    "max": 240,
+    "note": "циклограмма: 120 мин"
+   },
+   {
+    "key": "d_t_out2",
+    "label": "Доставка людей до ствола, вывоз смены, 2 смена",
+    "unit": "мин",
+    "value": 86.4,
+    "min": 0,
+    "max": 240,
+    "note": "циклограмма: 86,4 мин (в файле задано числом)"
+   },
+   {
+    "key": "d_v_cg",
+    "label": "Средняя скорость ПДМ при откатке по плечу",
+    "unit": "км/ч",
+    "value": 7.0,
+    "min": 2,
+    "max": 25,
+    "note": "циклограмма: t = n·(L/7)·60·2·1,2 мин; плечо до перегрузочного кармана 0,35 км"
+   },
+   {
+    "key": "d_k_man",
+    "label": "Коэффициент на разминовки и манёвры при откатке",
+    "unit": "",
+    "value": 1.2,
+    "min": 1.0,
+    "max": 2.0,
+    "note": "циклограмма: 1,2 («в протяжённость операций учтены разминовки»; цикл составлен для 2 ПДМ)"
+   },
+   {
+    "key": "d_t_wag",
+    "label": "Погрузка одного вагона из кармана",
+    "unit": "мин",
+    "value": 3.5,
+    "min": 0.5,
+    "max": 15,
+    "note": "циклограмма: 3,5 мин на вагон"
+   },
+   {
+    "key": "d_t_mixsp",
+    "label": "Нанесение торкрета из одного миксера (4 м³)",
+    "unit": "мин",
+    "value": 38.0,
+    "min": 10,
+    "max": 120,
+    "note": "циклограмма: 38 мин на миксер"
+   },
+   {
+    "key": "d_k_t1",
+    "label": "Коэффициент для первичного слоя",
+    "unit": "",
+    "value": 1.2,
+    "min": 1.0,
+    "max": 2.0,
+    "note": "циклограмма: 38·1,2 мин на миксер"
+   },
+   {
+    "key": "d_t_p1",
+    "label": "Подготовка к первичному слою",
+    "unit": "мин",
+    "value": 20.0,
+    "min": 0,
+    "max": 120,
+    "note": "циклограмма: +20 мин"
+   },
+   {
+    "key": "d_t_p2",
+    "label": "Подготовка и обслуживание основного слоя",
+    "unit": "мин",
+    "value": 60.0,
+    "min": 0,
+    "max": 240,
+    "note": "циклограмма: (20+20)+20 = 60 мин на заход в смену"
+   },
+   {
+    "key": "d_t_frame",
+    "label": "Установка одной арочной рамы PANTEX",
+    "unit": "мин",
+    "value": 30.0,
+    "min": 5,
+    "max": 180,
+    "note": "циклограмма: 30 мин на раму"
+   },
+   {
+    "key": "d_k_frame",
+    "label": "Коэффициент для установки рамы",
+    "unit": "",
+    "value": 1.25,
+    "min": 1.0,
+    "max": 2.0,
+    "note": "циклограмма: 30·1,25"
+   },
+   {
+    "key": "d_t_ad",
+    "label": "Бурение одного анкера",
+    "unit": "мин",
+    "value": 2.5,
+    "min": 0.5,
+    "max": 20,
+    "note": "циклограмма: L = 2,4 м, 2,5 мин на анкер"
+   },
+   {
+    "key": "d_t_ad0",
+    "label": "Подготовка к бурению анкеров",
+    "unit": "мин",
+    "value": 20.0,
+    "min": 0,
+    "max": 120,
+    "note": "циклограмма: +20 мин"
+   },
+   {
+    "key": "d_t_ai",
+    "label": "Установка одного анкера",
+    "unit": "мин",
+    "value": 1.5,
+    "min": 0.3,
+    "max": 15,
+    "note": "циклограмма: 1,5 мин"
+   },
+   {
+    "key": "d_k_ai",
+    "label": "Коэффициент для установки анкеров",
+    "unit": "",
+    "value": 1.2,
+    "min": 1.0,
+    "max": 2.0,
+    "note": "циклограмма: 1,5·1,2"
+   },
+   {
+    "key": "d_t_dh",
+    "label": "Бурение одного шпура забоя",
+    "unit": "мин",
+    "value": 2.0,
+    "min": 0.3,
+    "max": 15,
+    "note": "циклограмма: L = 2,2 м, 2 мин на шпур (с позиционированием)"
+   },
+   {
+    "key": "d_t_zh",
+    "label": "Заряжание одного шпура",
+    "unit": "мин",
+    "value": 1.0,
+    "min": 0.2,
+    "max": 10,
+    "note": "циклограмма: 1 мин на шпур"
+   },
+   {
+    "key": "d_t_vent_cg",
+    "label": "Проветривание после взрыва",
+    "unit": "мин",
+    "value": 30.0,
+    "min": 5,
+    "max": 240,
+    "note": "циклограмма: 30 мин"
+   },
+   {
+    "key": "d_t_set",
+    "label": "Интервал на схватывание слоя 1 до слоя 2",
+    "unit": "ч",
+    "value": 0.5,
+    "min": 0,
+    "max": 12,
+    "note": "допущение: по фактической циклограмме между первичным и основным слоем только установка рамы (≈ 38 мин); проверка, а не расчётная пауза"
+   },
+   {
+    "key": "d_t_cure",
+    "label": "Выдержка слоя 2 до следующего взрыва",
+    "unit": "ч",
+    "value": 4.0,
+    "min": 0,
+    "max": 24,
+    "note": "допущение: набор прочности перед взрывом; проверка по циклограмме"
+   },
+   {
+    "key": "d_v_mesh",
+    "label": "Монтаж сетки",
+    "unit": "м²/ч",
+    "value": 40.0,
+    "min": 5,
+    "max": 150,
+    "note": "допущение: с манипулятора, звеном"
+   },
+   {
+    "key": "d_a_anch",
+    "label": "Шаг анкеров вдоль выработки a",
+    "unit": "м",
+    "value": 1.2,
+    "min": 0.5,
+    "max": 3.0,
+    "note": "допущение: сетка анкеров по паспорту крепления"
+   },
+   {
+    "key": "d_b_anch",
+    "label": "Шаг анкеров по периметру b",
+    "unit": "м",
+    "value": 1.2,
+    "min": 0.5,
+    "max": 3.0,
+    "note": "допущение"
+   },
+   {
+    "key": "d_cab_ring",
+    "label": "Тросов в кольце",
+    "unit": "шт",
+    "value": 3,
+    "min": 0,
+    "max": 12,
+    "int": true,
+    "note": "допущение: в кровле"
+   },
+   {
+    "key": "d_cab_pitch",
+    "label": "Шаг колец тросов",
+    "unit": "м",
+    "value": 2.5,
+    "min": 1,
+    "max": 10,
+    "note": "допущение"
+   },
+   {
+    "key": "d_t_cab",
+    "label": "Установка одного троса Cabletec",
+    "unit": "мин",
+    "value": 18.0,
+    "min": 3,
+    "max": 90,
+    "note": "допущение: бурение, установка, нагнетание"
+   },
+   {
+    "key": "d_cab_share",
+    "label": "Доля заходок с тросовой крепью",
+    "unit": "",
+    "value": 1.0,
+    "min": 0,
+    "max": 1,
+    "note": "допущение: тросы только в зонах по проекту, 1 = во всех"
+   }
+  ]
+ },
+ {
+  "title": "Проходка гор. −480: Boomer T1D, ПДМ 1 м³, электровоз, рамы СВП, проколы, коммуникации",
+  "items": [
+   {
+    "key": "r_S",
+    "label": "Сечение выработки вчерне S (рамы СВП-27)",
+    "unit": "м²",
+    "value": 12.0,
+    "min": 6,
+    "max": 30,
+    "note": "допущение: арочная выработка под электровоз и ПДМ 1 м³, уточнить по паспорту (R1)"
+   },
+   {
+    "key": "r_b",
+    "label": "Ширина выработки по почве",
+    "unit": "м",
+    "value": 4.0,
+    "min": 2.5,
+    "max": 8,
+    "note": "допущение (R1)"
+   },
+   {
+    "key": "r_l_sh_max",
+    "label": "Наибольшая глубина шпура Boomer T1D",
+    "unit": "м",
+    "value": 2.4,
+    "min": 1.2,
+    "max": 3.6,
+    "note": "допущение: длина подачи T1D, уточнить (R2)"
+   },
+   {
+    "key": "r_kish",
+    "label": "Коэффициент использования шпура η",
+    "unit": "",
+    "value": 0.9,
+    "min": 0.5,
+    "max": 1.0,
+    "note": "допущение, как для остальных забоев"
+   },
+   {
+    "key": "r_nfr",
+    "label": "Рам СВП-27 на заходку",
+    "unit": "шт",
+    "value": 2,
+    "min": 1,
+    "max": 8,
+    "int": true,
+    "note": "допущение: заходка = 2 шага рам; задаётся в паспорте"
+   },
+   {
+    "key": "r_pitch1",
+    "label": "Шаг рам, условия 1 (устойчивые)",
+    "unit": "м",
+    "value": 1.0,
+    "min": 0.2,
+    "max": 1.5,
+    "note": "задание: шаг от 1 до 0,5 м"
+   },
+   {
+    "key": "r_pitch2",
+    "label": "Шаг рам, условия 2 (средние)",
+    "unit": "м",
+    "value": 0.75,
+    "min": 0.2,
+    "max": 1.5,
+    "note": "допущение между 1 и 0,5 м"
+   },
+   {
+    "key": "r_pitch3",
+    "label": "Шаг рам, условия 3 (слабые)",
+    "unit": "м",
+    "value": 0.5,
+    "min": 0.2,
+    "max": 1.5,
+    "note": "задание: 0,5 м"
+   },
+   {
+    "key": "r_pitch4",
+    "label": "Шаг рам, условия 4 (самые негативные)",
+    "unit": "м",
+    "value": 0.25,
+    "min": 0.2,
+    "max": 1.5,
+    "note": "задание: самые негативные условия — 0,25 м"
+   },
+   {
+    "key": "r_lag1",
+    "label": "Затяжка и забутовка, условия 1 (доля контура)",
+    "unit": "",
+    "value": 0.3,
+    "min": 0,
+    "max": 1,
+    "note": "допущение (R3)"
+   },
+   {
+    "key": "r_lag2",
+    "label": "Затяжка и забутовка, условия 2",
+    "unit": "",
+    "value": 0.6,
+    "min": 0,
+    "max": 1,
+    "note": "допущение (R3)"
+   },
+   {
+    "key": "r_lag3",
+    "label": "Затяжка и забутовка, условия 3",
+    "unit": "",
+    "value": 1.0,
+    "min": 0,
+    "max": 1,
+    "note": "допущение (R3)"
+   },
+   {
+    "key": "r_lag4",
+    "label": "Затяжка и забутовка, условия 4",
+    "unit": "",
+    "value": 1.0,
+    "min": 0,
+    "max": 1,
+    "note": "допущение (R3)"
+   },
+   {
+    "key": "r_sv1",
+    "label": "Подкрепка рамами СВП-22, условия 1 (доля рам)",
+    "unit": "",
+    "value": 0.0,
+    "min": 0,
+    "max": 1,
+    "note": "допущение (R4)"
+   },
+   {
+    "key": "r_sv2",
+    "label": "Подкрепка рамами СВП-22, условия 2",
+    "unit": "",
+    "value": 0.0,
+    "min": 0,
+    "max": 1,
+    "note": "допущение (R4)"
+   },
+   {
+    "key": "r_sv3",
+    "label": "Подкрепка рамами СВП-22, условия 3",
+    "unit": "",
+    "value": 0.25,
+    "min": 0,
+    "max": 1,
+    "note": "допущение (R4)"
+   },
+   {
+    "key": "r_sv4",
+    "label": "Подкрепка рамами СВП-22, условия 4",
+    "unit": "",
+    "value": 0.5,
+    "min": 0,
+    "max": 1,
+    "note": "допущение (R4)"
+   },
+   {
+    "key": "r_cond_spile",
+    "label": "Опережающее крепление (проколы) с условий №",
+    "unit": "",
+    "value": 3,
+    "min": 1,
+    "max": 5,
+    "int": true,
+    "note": "задание: в плохих условиях; 5 — не применять"
+   },
+   {
+    "key": "r_cond_cab",
+    "label": "Тросовая крепь по умолчанию с условий №",
+    "unit": "",
+    "value": 4,
+    "min": 1,
+    "max": 5,
+    "int": true,
+    "note": "допущение: тросы и бетон включаются вручную (R5); 5 — не применять"
+   },
+   {
+    "key": "r_t_fr27",
+    "label": "Установка одной рамы СВП-27 со стяжками",
+    "unit": "мин",
+    "value": 35.0,
+    "min": 5,
+    "max": 240,
+    "note": "допущение, хронометраж нужен (R6)"
+   },
+   {
+    "key": "r_t_fr22",
+    "label": "Установка одной рамы СВП-22 (подкрепка)",
+    "unit": "мин",
+    "value": 28.0,
+    "min": 5,
+    "max": 240,
+    "note": "допущение (R6)"
+   },
+   {
+    "key": "r_m_fr27",
+    "label": "Масса профиля СВП-27",
+    "unit": "кг/м",
+    "value": 27.0,
+    "min": 10,
+    "max": 60,
+    "note": "обозначение профиля: 27 кг/м"
+   },
+   {
+    "key": "r_m_fr22",
+    "label": "Масса профиля СВП-22",
+    "unit": "кг/м",
+    "value": 22.0,
+    "min": 10,
+    "max": 60,
+    "note": "обозначение профиля: 22 кг/м"
+   },
+   {
+    "key": "r_k_conn",
+    "label": "Коэффициент на стяжки и замки рамы",
+    "unit": "",
+    "value": 1.12,
+    "min": 1.0,
+    "max": 1.5,
+    "note": "допущение"
+   },
+   {
+    "key": "r_k_p22",
+    "label": "Периметр рамы СВП-22 к рамам СВП-27",
+    "unit": "",
+    "value": 0.85,
+    "min": 0.5,
+    "max": 1.0,
+    "note": "допущение: меньшее сечение (R4)"
+   },
+   {
+    "key": "r_t_lag",
+    "label": "Затяжка и забутовка лесом",
+    "unit": "мин/м²",
+    "value": 3.0,
+    "min": 0.5,
+    "max": 20,
+    "note": "допущение, хронометраж нужен (R3)"
+   },
+   {
+    "key": "r_d_lag",
+    "label": "Толщина затяжки",
+    "unit": "м",
+    "value": 0.06,
+    "min": 0.02,
+    "max": 0.15,
+    "note": "допущение"
+   },
+   {
+    "key": "r_d_bk",
+    "label": "Толщина забутовки пустот",
+    "unit": "м",
+    "value": 0.2,
+    "min": 0,
+    "max": 0.6,
+    "note": "допущение"
+   },
+   {
+    "key": "r_k_bk",
+    "label": "Доля контура с забутовкой",
+    "unit": "",
+    "value": 0.5,
+    "min": 0,
+    "max": 1,
+    "note": "допущение"
+   },
+   {
+    "key": "r_L_sp",
+    "label": "Длина прокола",
+    "unit": "м",
+    "value": 4.0,
+    "min": 2,
+    "max": 8,
+    "note": "задание: проколы длиной 4 м"
+   },
+   {
+    "key": "r_ov_sp",
+    "label": "Перекрытие комплектов проколов",
+    "unit": "м",
+    "value": 1.0,
+    "min": 0,
+    "max": 3,
+    "note": "допущение: комплект подаётся на L − перекрытие"
+   },
+   {
+    "key": "r_s_sp",
+    "label": "Шаг проколов по контуру",
+    "unit": "м",
+    "value": 0.3,
+    "min": 0.1,
+    "max": 1,
+    "note": "допущение (R7)"
+   },
+   {
+    "key": "r_arc_sp",
+    "label": "Доля контура под проколы (свод)",
+    "unit": "",
+    "value": 0.5,
+    "min": 0.2,
+    "max": 1,
+    "note": "допущение: свод"
+   },
+   {
+    "key": "r_t_sp",
+    "label": "Забивка одного прокола",
+    "unit": "мин",
+    "value": 4.0,
+    "min": 0.5,
+    "max": 30,
+    "note": "допущение (R7)"
+   },
+   {
+    "key": "r_t_sp0",
+    "label": "Подготовка к установке комплекта проколов",
+    "unit": "мин",
+    "value": 15.0,
+    "min": 0,
+    "max": 90,
+    "note": "допущение (R7)"
+   },
+   {
+    "key": "r_d_c",
+    "label": "Толщина бетонной крепи (полное сечение без почвы)",
+    "unit": "м",
+    "value": 0.3,
+    "min": 0.1,
+    "max": 0.8,
+    "note": "допущение (R5)"
+   },
+   {
+    "key": "r_k_c",
+    "label": "Коэффициент потерь бетона",
+    "unit": "",
+    "value": 1.05,
+    "min": 1.0,
+    "max": 1.3,
+    "note": "допущение"
+   },
+   {
+    "key": "r_t_form",
+    "label": "Установка и перестановка опалубки",
+    "unit": "мин",
+    "value": 60.0,
+    "min": 0,
+    "max": 480,
+    "note": "допущение (R5)"
+   },
+   {
+    "key": "r_t_mixc",
+    "label": "Подача и укладка одного миксера бетона 4 м³",
+    "unit": "мин",
+    "value": 45.0,
+    "min": 10,
+    "max": 180,
+    "note": "допущение (R5)"
+   },
+   {
+    "key": "r_t_cure_c",
+    "label": "Выдержка бетона до взрыва",
+    "unit": "ч",
+    "value": 6.0,
+    "min": 0,
+    "max": 48,
+    "note": "допущение (R5)"
+   },
+   {
+    "key": "r_t_rail",
+    "label": "Прокладка рельсового пути",
+    "unit": "мин/м",
+    "value": 15.0,
+    "min": 1,
+    "max": 120,
+    "note": "допущение, хронометраж нужен (R8)"
+   },
+   {
+    "key": "r_t_water",
+    "label": "Прокладка водопровода",
+    "unit": "мин/м",
+    "value": 4.0,
+    "min": 0.5,
+    "max": 60,
+    "note": "допущение (R8)"
+   },
+   {
+    "key": "r_t_air",
+    "label": "Прокладка воздухопровода",
+    "unit": "мин/м",
+    "value": 4.0,
+    "min": 0.5,
+    "max": 60,
+    "note": "допущение (R8)"
+   },
+   {
+    "key": "r_v_dr",
+    "label": "Скорость бурения Boomer T1D",
+    "unit": "м/мин",
+    "value": 1.4,
+    "min": 0.3,
+    "max": 4,
+    "note": "допущение для ультраосновных пород, уточнить (R2)"
+   },
+   {
+    "key": "r_t_hole",
+    "label": "Установка и вывод штанги на один шпур",
+    "unit": "мин",
+    "value": 0.9,
+    "min": 0.1,
+    "max": 5,
+    "note": "допущение (R2)"
+   },
+   {
+    "key": "r_t_dr0",
+    "label": "Подготовка к бурению Boomer T1D",
+    "unit": "мин",
+    "value": 20.0,
+    "min": 0,
+    "max": 120,
+    "note": "допущение (R2)"
+   },
+   {
+    "key": "r_V_k",
+    "label": "Ковш ПДМ",
+    "unit": "м³",
+    "value": 1.0,
+    "min": 0.3,
+    "max": 3,
+    "note": "задание: ПДМ 1 м³"
+   },
+   {
+    "key": "r_L_pdm",
+    "label": "Плечо ПДМ: забой → вагон",
+    "unit": "м",
+    "value": 40.0,
+    "min": 5,
+    "max": 300,
+    "note": "допущение, вагоны подаются к забою (R9)"
+   },
+   {
+    "key": "r_v_pdm",
+    "label": "Средняя скорость ПДМ",
+    "unit": "км/ч",
+    "value": 6.0,
+    "min": 2,
+    "max": 15,
+    "note": "допущение (R9)"
+   },
+   {
+    "key": "r_t_bk",
+    "label": "Черпание и разгрузка одного ковша",
+    "unit": "мин",
+    "value": 0.7,
+    "min": 0.2,
+    "max": 3,
+    "note": "допущение (R9)"
+   },
+   {
+    "key": "r_L_haul",
+    "label": "Плечо электровоза: забой → КДРВ",
+    "unit": "м",
+    "value": 1000.0,
+    "min": 50,
+    "max": 8000,
+    "note": "допущение, берётся из чертежа −480 на странице (R10)"
+   },
+   {
+    "key": "r_v_loco",
+    "label": "Скорость электровоза в выработке",
+    "unit": "км/ч",
+    "value": 10.0,
+    "min": 3,
+    "max": 25,
+    "note": "допущение (R10)"
+   },
+   {
+    "key": "r_t_sw",
+    "label": "Манёвры у забоя за обмен составов",
+    "unit": "мин",
+    "value": 6.0,
+    "min": 0,
+    "max": 60,
+    "note": "допущение (R10)"
+   },
+   {
+    "key": "r_t_unl",
+    "label": "Разгрузка состава на КДРВ",
+    "unit": "мин",
+    "value": 1.5,
+    "min": 0.5,
+    "max": 15,
+    "note": "данные шахты: 1,5 мин на состав из 9 ВДР"
+   },
+   {
+    "key": "r_n_rakes",
+    "label": "Составов вагонов у забоя",
+    "unit": "шт",
+    "value": 1,
+    "min": 1,
+    "max": 3,
+    "int": true,
+    "note": "1 — электровоз уходит с гружёным, ПДМ ждёт порожние; 2 — подмена"
+   }
+  ]
+ },
+ {
+  "title": "Скреперная добыча гор. −480: орты №28, №27, №26",
+  "items": [
+   {
+    "key": "s_V_c",
+    "label": "Ёмкость ковша скрепера",
+    "unit": "м³",
+    "value": 0.75,
+    "min": 0.2,
+    "max": 3,
+    "note": "допущение (I2): тип скрепера и лебёдки не известен"
+   },
+   {
+    "key": "s_k_n",
+    "label": "Коэффициент наполнения ковша скрепера",
+    "unit": "",
+    "value": 0.8,
+    "min": 0.4,
+    "max": 1.0,
+    "note": "допущение (I2)"
+   },
+   {
+    "key": "s_v_g",
+    "label": "Скорость каната, груженый ход",
+    "unit": "м/с",
+    "value": 1.0,
+    "min": 0.3,
+    "max": 3,
+    "note": "допущение (I2): типично 1,0–1,5 м/с"
+   },
+   {
+    "key": "s_v_p",
+    "label": "Скорость каната, порожний ход",
+    "unit": "м/с",
+    "value": 1.3,
+    "min": 0.3,
+    "max": 3,
+    "note": "допущение (I2)"
+   },
+   {
+    "key": "s_t_sw",
+    "label": "Время на загрузку ковша и переключение лебёдки за цикл",
+    "unit": "с",
+    "value": 25.0,
+    "min": 0,
+    "max": 180,
+    "note": "допущение (I2)"
+   },
+   {
+    "key": "s_L_drag",
+    "label": "Длина скреперования по умолчанию (штрек ШС → люк на орте)",
+    "unit": "м",
+    "value": 40.0,
+    "min": 5,
+    "max": 150,
+    "note": "допущение (I3): длины ШС по чертежу и места люков уточнить"
+   },
+   {
+    "key": "s_k_use",
+    "label": "Коэффициент использования лебёдки в смену",
+    "unit": "",
+    "value": 0.8,
+    "min": 0.3,
+    "max": 1.0,
+    "note": "допущение (I2)"
+   },
+   {
+    "key": "s_n_scr",
+    "label": "Скреперных установок на орт по умолчанию",
+    "unit": "шт",
+    "value": 2,
+    "min": 1,
+    "max": 8,
+    "int": true,
+    "note": "допущение (I3)"
+   },
+   {
+    "key": "s_t_wag",
+    "label": "Погрузка одного вагона из люка орта",
+    "unit": "мин",
+    "value": 2.0,
+    "min": 0.5,
+    "max": 15,
+    "note": "допущение (I4): из бункера под люком, запас руды не ограничен"
+   },
+   {
+    "key": "s_t_spot",
+    "label": "Подача и смена состава у люка",
+    "unit": "мин",
+    "value": 5.0,
+    "min": 0,
+    "max": 30,
+    "note": "допущение (I4)"
+   },
+   {
+    "key": "s_ktg",
+    "label": "КТГ скреперных установок",
+    "unit": "",
+    "value": 0.85,
+    "min": 0.3,
+    "max": 1.0,
+    "note": "допущение (I2): как у СГШО"
+   }
+  ]
+ },
+ {
+  "title": "Добыча: подэтажное принудительное обрушение с торцевым выпуском (веера, ЛНС)",
+  "items": [
+   {
+    "key": "m_f",
+    "label": "Крепость руды по Протодьяконову f",
+    "unit": "",
+    "value": 10.0,
+    "min": 2,
+    "max": 20,
+    "note": "допущение (J2): хромитовая руда с серпентинизацией, уточнить по испытаниям"
+   },
+   {
+    "key": "m_b_fr",
+    "label": "Средний шаг трещин в массиве",
+    "unit": "м",
+    "value": 0.4,
+    "min": 0.05,
+    "max": 3,
+    "note": "допущение (J2): по замерам трещиноватости"
+   },
+   {
+    "key": "m_h",
+    "label": "Высота подэтажа",
+    "unit": "м",
+    "value": 20.0,
+    "min": 8,
+    "max": 40,
+    "note": "допущение (J1): на плане −376/−402/−392 возможны 10, 16 и 26 м"
+   },
+   {
+    "key": "m_b",
+    "label": "Расстояние между осями БДШ",
+    "unit": "м",
+    "value": 20.0,
+    "min": 8,
+    "max": 40,
+    "note": "по плану −402: БДШ 2/2…2/5 через 19–20 м"
+   },
+   {
+    "key": "m_Ld",
+    "label": "Длина БДШ",
+    "unit": "м",
+    "value": 55.0,
+    "min": 20,
+    "max": 120,
+    "note": "по плану −402: 38…62 м"
+   },
+   {
+    "key": "m_k_f",
+    "label": "Коэффициент высоты веера к высоте подэтажа",
+    "unit": "",
+    "value": 1.1,
+    "min": 1.0,
+    "max": 1.5,
+    "note": "допущение (J1): перебур в верхний подэтаж"
+   },
+   {
+    "key": "m_k_ov",
+    "label": "Перекрытие вееров соседних БДШ",
+    "unit": "",
+    "value": 1.05,
+    "min": 0.9,
+    "max": 1.5,
+    "note": "допущение (J1)"
+   },
+   {
+    "key": "m_d",
+    "label": "Диаметр скважин веера",
+    "unit": "м",
+    "value": 0.076,
+    "min": 0.043,
+    "max": 0.14,
+    "note": "допущение (J3): Ø 76 мм"
+   },
+   {
+    "key": "m_delta",
+    "label": "Плотность заряжания ВВ",
+    "unit": "кг/м³",
+    "value": 900.0,
+    "min": 600,
+    "max": 1300,
+    "note": "допущение (J3): эмульсионное ВВ или гранулит"
+   },
+   {
+    "key": "m_l_st",
+    "label": "Забойка (незаряженная длина у устья)",
+    "unit": "м",
+    "value": 1.0,
+    "min": 0,
+    "max": 5,
+    "note": "допущение (J3)"
+   },
+   {
+    "key": "m_k_a",
+    "label": "Отношение расстояния между концами скважин к ЛНС",
+    "unit": "",
+    "value": 1.1,
+    "min": 0.7,
+    "max": 1.6,
+    "note": "допущение (J3)"
+   },
+   {
+    "key": "m_q0",
+    "label": "Удельный расход ВВ: постоянная часть",
+    "unit": "кг/м³",
+    "value": 0.8,
+    "min": 0.05,
+    "max": 4,
+    "note": "допущение (J3): q = q₀ + k_q · f, ≈0,43 кг/т при γ в массиве 3,7 т/м³"
+   },
+   {
+    "key": "m_k_q",
+    "label": "Удельный расход ВВ: прирост на единицу f",
+    "unit": "кг/м³",
+    "value": 0.08,
+    "min": 0,
+    "max": 0.5,
+    "note": "допущение (J3)"
+   },
+   {
+    "key": "m_k_dev",
+    "label": "Отклонение скважин, доля от длины",
+    "unit": "",
+    "value": 0.015,
+    "min": 0.002,
+    "max": 0.06,
+    "note": "допущение (J4): 1,5 % длины, по замерам бурения"
+   },
+   {
+    "key": "m_L_rig",
+    "label": "Наибольшая длина скважины станка",
+    "unit": "м",
+    "value": 35.0,
+    "min": 10,
+    "max": 60,
+    "note": "допущение (J4): тип станка не известен"
+   },
+   {
+    "key": "m_k_col",
+    "label": "Минимальное расстояние между зарядами в долях диаметра",
+    "unit": "",
+    "value": 5.0,
+    "min": 2,
+    "max": 15,
+    "note": "допущение (J3)"
+   },
+   {
+    "key": "m_eta",
+    "label": "Извлечение руды из кольца",
+    "unit": "",
+    "value": 0.8,
+    "min": 0.4,
+    "max": 1.0,
+    "note": "допущение (J5)"
+   },
+   {
+    "key": "m_dil",
+    "label": "Разубоживание (доля породы в выпуске)",
+    "unit": "",
+    "value": 0.15,
+    "min": 0,
+    "max": 0.6,
+    "note": "допущение (J5)"
+   },
+   {
+    "key": "m_n_rig",
+    "label": "Буровых станков веерного бурения",
+    "unit": "шт",
+    "value": 2,
+    "min": 1,
+    "max": 10,
+    "int": true,
+    "note": "допущение (J4)"
+   },
+   {
+    "key": "m_v_dr",
+    "label": "Скорость бурения скважин",
+    "unit": "м/мин",
+    "value": 1.2,
+    "min": 0.2,
+    "max": 4,
+    "note": "допущение (J4)"
+   },
+   {
+    "key": "m_t_h",
+    "label": "Позиционирование и штанги на одну скважину",
+    "unit": "мин",
+    "value": 1.5,
+    "min": 0,
+    "max": 10,
+    "note": "допущение (J4)"
+   },
+   {
+    "key": "m_t_dr0",
+    "label": "Подготовка станка к кольцу",
+    "unit": "мин",
+    "value": 30.0,
+    "min": 0,
+    "max": 180,
+    "note": "допущение (J4)"
+   },
+   {
+    "key": "m_n_ch",
+    "label": "Зарядных машин",
+    "unit": "шт",
+    "value": 1,
+    "min": 1,
+    "max": 6,
+    "int": true,
+    "note": "допущение (J4)"
+   },
+   {
+    "key": "m_v_ch",
+    "label": "Производительность заряжания",
+    "unit": "кг/мин",
+    "value": 30.0,
+    "min": 5,
+    "max": 150,
+    "note": "допущение (J4)"
+   },
+   {
+    "key": "m_t_hc",
+    "label": "Подготовка одной скважины к заряжанию",
+    "unit": "мин",
+    "value": 0.8,
+    "min": 0,
+    "max": 10,
+    "note": "допущение (J4)"
+   },
+   {
+    "key": "m_t_ch0",
+    "label": "Подготовка зарядной машины к кольцу",
+    "unit": "мин",
+    "value": 20.0,
+    "min": 0,
+    "max": 120,
+    "note": "допущение (J4)"
+   },
+   {
+    "key": "m_n_blast",
+    "label": "Колец в одном взрыве (взрыв один за смену)",
+    "unit": "шт",
+    "value": 1,
+    "min": 1,
+    "max": 6,
+    "int": true,
+    "note": "допущение (J4)"
+   },
+   {
+    "key": "m_L_ort",
+    "label": "Добавка к плечу ПДМ: путь по доставочному орту до места погрузки",
+    "unit": "м",
+    "value": 30.0,
+    "min": 0,
+    "max": 300,
+    "note": "допущение (J6)"
+   },
+   {
+    "key": "m_k_draw",
+    "label": "Коэффициент использования ПДМ на выпуске",
+    "unit": "",
+    "value": 0.9,
+    "min": 0.3,
+    "max": 1.0,
+    "note": "допущение (J6)"
+   }
+  ]
+ },
+ {
+  "title": "Календарь и готовность",
+  "items": [
+   {
+    "key": "T_sm",
+    "label": "Подземная смена",
+    "unit": "с",
+    "value": 36720.0,
+    "min": 3600,
+    "max": 43200,
+    "note": "данные шахты: 10,2 ч"
+   },
+   {
+    "key": "t_to_start",
+    "label": "Ежесменное ТО в начале смены",
+    "unit": "с",
+    "value": 1800.0,
+    "min": 0,
+    "max": 7200,
+    "note": "данные шахты: 30 мин, входит в смену"
+   },
+   {
+    "key": "t_to_end",
+    "label": "Ежесменное ТО в конце смены",
+    "unit": "с",
+    "value": 1800.0,
+    "min": 0,
+    "max": 7200,
+    "note": "данные шахты: 30 мин, входит в смену"
+   },
+   {
+    "key": "ktg",
+    "label": "КТГ электровозов",
+    "unit": "",
+    "value": 0.8,
+    "min": 0.1,
+    "max": 1.0,
+    "note": "данные шахты: 0,8; T_эф = (T_см − t_ТО)·КТГ"
+   },
+   {
+    "key": "gap_shifts",
+    "label": "Технологический перерыв между сменами",
+    "unit": "с",
+    "value": 6480.0,
+    "min": 0,
+    "max": 21600,
+    "note": "3,6 ч в сутки, делится поровну (1,8 ч), допущение, время начала смен уточнить (B6)"
+   },
+   {
+    "key": "plan_shift",
+    "label": "План руды в смену",
+    "unit": "т",
+    "value": 2500.0,
+    "min": 0,
+    "max": 20000,
+    "note": "данные шахты: 2500 т в смену"
+   }
+  ]
+ }
+];
+if (typeof module !== 'undefined') { module.exports = { groups: LG_GROUPS, version: LG_VERSION }; }
+</script>
+<script>'use strict';
+/* Ядро имитации для браузера и Node: точный порт sim/engine.py, sim/kinematics.py и sim/params.py.
+   Дискретно-событийная модель, время в секундах. Описание и формулы: simulation_model_concept.md.
+   Любое изменение логики вносится в Python и JavaScript одновременно; tests/test_parity.py сверяет оба ядра. */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./params-data.js').groups);
+  else root.LG = factory(root.LG_GROUPS);
+}(typeof self !== 'undefined' ? self : this, function (GROUPS) {
+
+  /* ---------- параметры (sim/params.py) ---------- */
+  function defaults() {
+    const out = {};
+    GROUPS.forEach(g => g.items.forEach(it => { out[it.key] = it.value; }));
+    return out;
+  }
+  function meta() {
+    const out = {};
+    GROUPS.forEach(g => g.items.forEach(it => { out[it.key] = it; }));
+    return out;
+  }
+  const NUM_RE = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
+  const SPECIAL_RE = /^[+-]?(inf|infinity|nan)$/i;
+
+  /* Проверка и приведение типов: возвращает {clean, errors}. */
+  function validate(values) {
+    const m = meta();
+    const clean = {}, errors = [];
+    Object.keys(m).forEach(k => {
+      const it = m[k];
+      const raw = (values && Object.prototype.hasOwnProperty.call(values, k)) ? values[k] : it.value;
+      let v;
+      if (typeof raw === 'number') v = raw;
+      else if (typeof raw === 'boolean') v = raw ? 1 : 0;
+      else if (typeof raw === 'string') {
+        const s = raw.trim();
+        if (NUM_RE.test(s)) v = Number(s);
+        else if (SPECIAL_RE.test(s)) { errors.push(it.label + ': недопустимое значение'); return; }
+        else { errors.push(it.label + ': не число'); return; }
+      } else { errors.push(it.label + ': не число'); return; }
+      if (!Number.isFinite(v)) { errors.push(it.label + ': недопустимое значение'); return; }
+      if (v < it.min || v > it.max) { errors.push(it.label + ': допустимо от ' + it.min + ' до ' + it.max); return; }
+      if (it.int) {
+        if (Math.abs(v - Math.round(v)) > 1e-9) { errors.push(it.label + ': нужно целое число'); return; }
+        v = Math.round(v);
+      }
+      clean[k] = v;
+    });
+    return { clean, errors };
+  }
+
+  /* ---------- кинематика (sim/kinematics.py) ---------- */
+  const K = {
+    speedMs: (vKmh, kv) => vKmh * kv / 3.6,
+    accelLoss: (v, a) => v / (2 * a),
+    brakeLoss: (v, b) => v / (2 * b),
+    stopLoss: (v, a, b) => v / (2 * a) + v / (2 * b),
+    accelPath: (v, a) => v * v / (2 * a),
+    brakePath: (v, b) => v * v / (2 * b),
+    trainLength: (lLoco, n, lWag) => lLoco + n * lWag,
+    loopCapacity: (lRazm, lTrain, lReserve) => Math.floor(lRazm / (lTrain + lReserve)),
+    loadingTrainTime: p => p.t_post + p.n_wagons * (p.t_podacha + p.t_pdm),
+    cycleAnalytic(p) {
+      const v = K.speedMs(p.v_kmh, p.k_v);
+      return K.loadingTrainTime(p) + p.t_unload + 2 * p.L_path / v + 2 * K.stopLoss(v, p.a, p.b);
+    },
+  };
+
+  /* ---------- движок (sim/engine.py) ---------- */
+  const MOVE = ['ход гружёный', 'ход порожний'];
+  const LOAD = ['постановка под погрузку', 'подача вагона', 'погрузка'];
+  const UNL = ['разгрузка'];
+  const WAIT = ['ожидание поста', 'ожидание ПДМ', 'ожидание КДРВ',
+    'ожидание блок-участка', 'ожидание в выработке', 'стоянка на разминовке'];
+  const OFF = ['вне работы'];
+  const STATE_NAMES = MOVE.concat(LOAD, UNL, WAIT, OFF);
+  const STATE_IDX = {};
+  STATE_NAMES.forEach((s, i) => { STATE_IDX[s] = i; });
+
+  const r1 = x => Number(x.toFixed(1));      // как round(x, 1) в Python (точных «половин» для 0,1 не бывает)
+  const sum = a => { let s = 0; for (let i = 0; i < a.length; i++) s += a[i]; return s; };
+
+  function makeWindows(P, kind) {
+    const nShifts = kind === 'shift' ? 1 : 2;
+    const tEff = (P.T_sm - P.t_to_start - P.t_to_end) * P.ktg;
+    const wins = [];
+    let s = 0;
+    for (let i = 0; i < nShifts; i++) {
+      wins.push([s + P.t_to_start, s + P.t_to_start + tEff]);
+      s += P.T_sm + P.gap_shifts;
+    }
+    const horizon = kind === 'shift' ? P.T_sm : nShifts * (P.T_sm + P.gap_shifts);
+    return { wins, horizon, nShifts };
+  }
+
+  /* Очередь событий: двоичная куча по (время, порядковый номер) — порядок как у heapq. */
+  class Heap {
+    constructor() { this.a = []; }
+    get length() { return this.a.length; }
+    static less(x, y) { return x.t < y.t || (x.t === y.t && x.seq < y.seq); }
+    push(e) {
+      const a = this.a; a.push(e);
+      let i = a.length - 1;
+      while (i > 0) {
+        const p = (i - 1) >> 1;
+        if (!Heap.less(a[i], a[p])) break;
+        const tmp = a[i]; a[i] = a[p]; a[p] = tmp; i = p;
+      }
+    }
+    pop() {
+      const a = this.a, top = a[0], last = a.pop();
+      if (a.length) {
+        a[0] = last;
+        let i = 0;
+        const n = a.length;
+        for (;;) {
+          const l = 2 * i + 1, r = l + 1;
+          let m = i;
+          if (l < n && Heap.less(a[l], a[m])) m = l;
+          if (r < n && Heap.less(a[r], a[m])) m = r;
+          if (m === i) break;
+          const tmp = a[i]; a[i] = a[m]; a[m] = tmp; i = m;
+        }
+      }
+      return top;
+    }
+  }
+
+  class Block {
+    constructor() { this.holder = null; this.waiters = []; this.occStart = 0; this.busy = 0; }
+  }
+
+  class Loco {
+    constructor(i) {
+      this.id = i; this.node = 0; this.dir = -1; this.loaded = false; this.cargo = 0; this.pending = 0;
+      this.holding = null; this.parkedAt = null; this.post = null; this.wagon = 0;
+      this.state = null; this.stateT = 0; this.x0 = 0; this.destX = 0; this.arrT = 0; this.loadT0 = 0; this.post0 = -1;
+      this.states = []; this.marks = []; this.trips = 0; this.tonnes = 0;
+    }
+  }
+
+  class Engine {
+    constructor(P, windows, horizon) {
+      this.P = P; this.windows = windows; this.horizon = horizon;
+      this.t = 0; this.q = new Heap(); this.seq = 0;
+      this.v = K.speedMs(P.v_kmh, P.k_v);
+      this.nb = Math.trunc(P.n_blocks);
+      this.Lb = P.L_path / this.nb;
+      this.Lp = K.trainLength(P.L_loco, Math.trunc(P.n_wagons), P.L_wag);
+      this.capLoop = K.loopCapacity(P.L_razm, this.Lp, P.L_zap);
+      this.lossA = K.accelLoss(this.v, P.a);
+      this.lossB = K.brakeLoss(this.v, P.b);
+      this.blocks = [];
+      for (let i = 0; i < this.nb; i++) this.blocks.push(new Block());
+      this.parked = new Array(this.nb + 1).fill(0);
+      const nPosts = Math.trunc(P.n_posts);
+      this.posts = new Array(nPosts).fill(null);
+      this.postStart = new Array(nPosts).fill(0);
+      this.postBusy = new Array(nPosts).fill(0);
+      this.postQ = [];
+      this.loaderCnt = 0; this.loaderQ = []; this.loaderBusy = 0;
+      this.kdrv = null; this.kdrvQ = []; this.kdrvStart = 0; this.kdrvBusy = 0;
+      this.loadedTotal = 0; this.unloadedTotal = 0; this.unloadEvents = [];
+      this.qPost = [[0, 0]]; this.qKdrv = [[0, 0]]; this.qLoader = [[0, 0]];
+      this.deadlock = false;
+      this.locos = [];
+      for (let i = 0; i < Math.trunc(P.n_loco); i++) this.locos.push(new Loco(i));
+    }
+
+    /* ---------- вспомогательное ---------- */
+    at(t, fn, args) { this.q.push({ t, seq: this.seq++, fn, args: args || [] }); }
+    overlap(t0, t1) {
+      let s = 0;
+      for (const w of this.windows) {
+        const lo = Math.max(w[0], t0), hi = Math.min(w[1], t1);
+        if (hi > lo) s += hi - lo;
+      }
+      return s;
+    }
+    inWindow(t) { return this.windows.some(w => w[0] <= t && t < w[1]); }
+    nextWindowStart(t) {
+      let best = null;
+      for (const w of this.windows) if (w[0] > t && (best === null || w[0] < best)) best = w[0];
+      return best;
+    }
+    logq() {
+      const t = this.t;
+      this.qPost.push([t, this.postQ.length]);
+      this.qKdrv.push([t, this.kdrvQ.length]);
+      this.qLoader.push([t, this.loaderQ.length]);
+    }
+    setState(l, s) {
+      const t = this.t;
+      if (l.state !== null && t > l.stateT) {
+        l.states.push([l.stateT, t, l.state, l.x0, l.node * this.Lb, l.loaded, l.post0]);
+      }
+      l.state = s; l.stateT = t; l.x0 = l.node * this.Lb;
+      l.post0 = l.post !== null ? l.post : -1;
+    }
+
+    /* ---------- цикл локомотива ---------- */
+    wantPost(l) {
+      const t = this.t;
+      if (!this.inWindow(t)) {
+        const ns = this.nextWindowStart(t);
+        this.setState(l, 'вне работы');
+        if (ns !== null) this.at(ns, this.wantPost, [l]);
+        return;
+      }
+      this.setState(l, 'ожидание поста');
+      this.postQ.push(l);
+      this.assignPosts();
+      this.logq();
+    }
+    sendOff(l) {
+      const ns = this.nextWindowStart(this.t);
+      this.setState(l, 'вне работы');
+      if (ns !== null) this.at(ns, this.wantPost, [l]);
+    }
+    windowEnd() {
+      const q = this.postQ; this.postQ = [];
+      q.forEach(l => this.sendOff(l));
+      this.logq();
+    }
+    assignPosts() {
+      while (this.postQ.length) {
+        const free = this.posts.indexOf(null);
+        if (free < 0) break;
+        const l = this.postQ.shift();
+        if (!this.inWindow(this.t)) { this.sendOff(l); continue; }
+        this.posts[free] = l;
+        this.postStart[free] = this.t;
+        l.post = free; l.wagon = 0;
+        this.setState(l, 'постановка под погрузку');
+        this.at(this.t + this.P.t_post, this.spotWagon, [l]);
+      }
+      this.logq();
+    }
+    spotWagon(l) {
+      this.setState(l, 'подача вагона');
+      this.at(this.t + this.P.t_podacha, this.reqLoader, [l]);
+    }
+    reqLoader(l) {
+      this.setState(l, 'ожидание ПДМ');
+      this.loaderQ.push(l);
+      this.grantLoader();
+    }
+    grantLoader() {
+      while (this.loaderQ.length && this.loaderCnt < Math.trunc(this.P.n_loader)) {
+        const l = this.loaderQ.shift();
+        this.loaderCnt += 1;
+        l.loadT0 = this.t;
+        this.setState(l, 'погрузка');
+        this.at(this.t + this.P.t_pdm, this.endLoadWagon, [l]);
+      }
+      this.logq();
+    }
+    endLoadWagon(l) {
+      this.loaderCnt -= 1;
+      this.loaderBusy += this.overlap(l.loadT0, this.t);
+      l.wagon += 1;
+      this.grantLoader();
+      if (l.wagon < Math.trunc(this.P.n_wagons)) this.spotWagon(l);
+      else this.finishLoading(l);
+    }
+    finishLoading(l) {
+      l.loaded = true;
+      l.cargo = Math.trunc(this.P.n_wagons) * this.P.m_wag;
+      this.loadedTotal += l.cargo;
+      const i = l.post;
+      this.postBusy[i] += this.overlap(this.postStart[i], this.t);
+      this.posts[i] = null;
+      l.post = null;
+      this.assignPosts();
+      l.dir = 1;
+      l.pending = this.lossA;
+      this.requestBlock(l, 0, 0);
+    }
+
+    /* ---------- блок-участки ---------- */
+    requestBlock(l, j, node) {
+      const B = this.blocks[j];
+      if (B.holder === null) { this.grant(l, j); return; }
+      B.waiters.push([l, this.t]);
+      if (node === 0 || node === this.nb) {
+        this.setState(l, 'ожидание блок-участка');
+      } else if (this.parked[node] < this.capLoop) {
+        this.parked[node] += 1;
+        l.parkedAt = node;
+        l.pending = this.lossA + this.lossB;
+        this.setState(l, 'стоянка на разминовке');
+        if (l.holding !== null) {
+          this.at(this.t + this.Lp / this.v, this.releaseBlock, [l.holding, l]);
+          l.holding = null;
+        }
+      } else {
+        l.pending = this.lossA + this.lossB;
+        this.setState(l, 'ожидание в выработке');
+      }
+    }
+    grant(l, j) {
+      const t = this.t;
+      const B = this.blocks[j];
+      B.holder = l; B.occStart = t;
+      if (l.parkedAt !== null) { this.parked[l.parkedAt] -= 1; l.parkedAt = null; }
+      const pend = l.pending;
+      l.pending = 0;
+      const d = l.dir;
+      const dest = d === 1 ? j + 1 : j;
+      const endDest = d === 1 ? dest === this.nb : dest === 0;
+      const tArr = t + pend + this.Lb / this.v + (endDest ? this.lossB : 0);
+      if (l.holding !== null) this.at(t + pend + this.Lp / this.v, this.releaseBlock, [l.holding, l]);
+      l.holding = j;
+      this.setState(l, l.loaded ? 'ход гружёный' : 'ход порожний');
+      l.destX = dest * this.Lb;
+      l.arrT = tArr;
+      this.at(tArr, this.arrive, [l, dest]);
+    }
+    arrive(l, node) {
+      l.node = node;
+      const d = l.dir;
+      if ((d === 1 && node === this.nb) || (d === -1 && node === 0)) {
+        this.at(this.t + this.Lp / this.v, this.releaseBlock, [l.holding, l]);
+        l.holding = null;
+        if (d === 1) this.wantKdrv(l); else this.wantPost(l);
+      } else {
+        const nj = d === 1 ? node : node - 1;
+        this.requestBlock(l, nj, node);
+      }
+    }
+    releaseBlock(j, l) {
+      const B = this.blocks[j];
+      if (B.holder !== l) return;
+      B.busy += this.overlap(B.occStart, this.t);
+      B.holder = null;
+      if (B.waiters.length) {
+        // приоритет гружёным, затем по времени постановки в очередь, затем по номеру (как min по кортежу в Python)
+        let bi = 0, bk = null;
+        for (let i = 0; i < B.waiters.length; i++) {
+          const w = B.waiters[i];
+          const k = [w[0].loaded ? 0 : 1, w[1], w[0].id];
+          if (bk === null || k[0] < bk[0] || (k[0] === bk[0] && (k[1] < bk[1] || (k[1] === bk[1] && k[2] < bk[2])))) { bi = i; bk = k; }
+        }
+        const best = B.waiters.splice(bi, 1)[0];
+        this.grant(best[0], j);
+      }
+    }
+
+    /* ---------- КДРВ ---------- */
+    wantKdrv(l) {
+      this.setState(l, 'ожидание КДРВ');
+      this.kdrvQ.push(l);
+      this.grantKdrv();
+      this.logq();
+    }
+    grantKdrv() {
+      if (this.kdrv === null && this.kdrvQ.length) {
+        const l = this.kdrvQ.shift();
+        this.kdrv = l;
+        this.kdrvStart = this.t;
+        this.setState(l, 'разгрузка');
+        this.at(this.t + this.P.t_unload, this.endUnload, [l]);
+        this.logq();
+      }
+    }
+    endUnload(l) {
+      const t = this.t;
+      this.kdrvBusy += this.overlap(this.kdrvStart, t);
+      this.kdrv = null;
+      this.unloadedTotal += l.cargo;
+      l.tonnes += l.cargo;
+      l.cargo = 0;
+      l.loaded = false;
+      l.trips += 1;
+      l.marks.push(t);
+      this.unloadEvents.push([t, this.unloadedTotal]);
+      this.grantKdrv();
+      l.dir = -1;
+      l.pending = this.lossA;
+      this.requestBlock(l, this.nb - 1, this.nb);
+    }
+
+    /* ---------- прогон ---------- */
+    run() {
+      this.locos.forEach(l => this.at(0, this.wantPost, [l]));
+      this.windows.forEach(w => this.at(w[1], this.windowEnd, []));
+      let drained = true;
+      while (this.q.length) {
+        const e = this.q.pop();
+        if (e.t > this.horizon) { drained = false; break; }
+        this.t = e.t;
+        e.fn.apply(this, e.args);
+      }
+      if (drained) this.deadlock = this.locos.some(l => WAIT.indexOf(l.state) >= 0);
+      this.t = this.horizon;
+      this.locos.forEach(l => {
+        let x1 = l.node * this.Lb;
+        if (MOVE.indexOf(l.state) >= 0 && l.arrT > l.stateT) {
+          const frac = Math.min(1, (this.horizon - l.stateT) / (l.arrT - l.stateT));
+          x1 = l.x0 + (l.destX - l.x0) * frac;
+        }
+        if (this.horizon > l.stateT) l.states.push([l.stateT, this.horizon, l.state, l.x0, x1, l.loaded, l.post0]);
+      });
+      this.blocks.forEach(B => { if (B.holder !== null) B.busy += this.overlap(B.occStart, this.horizon); });
+      this.posts.forEach((h, i) => { if (h !== null) this.postBusy[i] += this.overlap(this.postStart[i], this.horizon); });
+      if (this.kdrv !== null) this.kdrvBusy += this.overlap(this.kdrvStart, this.horizon);
+      this.locos.forEach(l => { if (l.state === 'погрузка') this.loaderBusy += this.overlap(l.loadT0, this.horizon); });
+    }
+  }
+
+  /* Значение ступенчатой функции по событиям [[t, v], ...] на сетке времени. */
+  function stepSeries(events, grid) {
+    const out = [];
+    let k = 0, cur = 0;
+    for (let i = 0; i < grid.length; i++) {
+      const g = grid[i];
+      while (k < events.length && events[k][0] <= g) { cur = events[k][1]; k++; }
+      out.push(cur);
+    }
+    return out;
+  }
+  const maxOf = (a, f) => { let m = -Infinity; for (let i = 0; i < a.length; i++) { const v = f(a[i]); if (v > m) m = v; } return m; };
+
+  function simulate(P, kind, windows, horizon) {
+    kind = kind || 'shift';
+    let wins, hz, nShifts;
+    if (!windows) { const w = makeWindows(P, kind); wins = w.wins; hz = w.horizon; nShifts = w.nShifts; }
+    else { wins = windows; hz = horizon; nShifts = windows.length; }
+    if (horizon !== undefined && horizon !== null) hz = horizon;
+    const eng = new Engine(P, wins, hz);
+    eng.run();
+    const tSum = sum(wins.map(w => w[1] - w[0]));
+
+    const perLoco = [], waitAcc = {}, allCycles = [];
+    WAIT.forEach(s => { waitAcc[s] = []; });
+    eng.locos.forEach(l => {
+      const acc = {};
+      STATE_NAMES.forEach(s => { acc[s] = 0; });
+      l.states.forEach(st => {
+        acc[st[2]] += eng.overlap(st[0], st[1]);
+        if (waitAcc[st[2]]) waitAcc[st[2]].push(st[1] - st[0]);
+      });
+      const work = sum(MOVE.concat(LOAD, UNL).map(s => acc[s]));
+      const cyc = [];
+      for (let i = 1; i < l.marks.length; i++) cyc.push(l.marks[i] - l.marks[i - 1]);
+      cyc.forEach(c => allCycles.push(c));
+      const share = {};
+      STATE_NAMES.forEach(s => { if (s !== 'вне работы') share[s] = tSum ? acc[s] / tSum : 0; });
+      perLoco.push({
+        id: l.id + 1, trips: l.trips, tonnes: r1(l.tonnes),
+        util: tSum ? work / tSum : 0, share,
+        cycle_mean: cyc.length ? sum(cyc) / cyc.length : null,
+      });
+    });
+    const waits = WAIT.map(s => {
+      const arr = waitAcc[s];
+      return { state: s, count: arr.length, total: sum(arr), mean: arr.length ? sum(arr) / arr.length : 0, max: arr.length ? Math.max.apply(null, arr) : 0 };
+    });
+
+    const inTransit = sum(eng.locos.map(l => l.cargo));
+    const planTotal = eng.P.plan_shift * nShifts;
+    const tonnes = eng.unloadedTotal;
+    const trains = sum(eng.locos.map(l => l.trips));
+
+    const grid = [];
+    for (let i = 0; i <= Math.floor(hz / 60); i++) grid.push(i * 60);
+    const series = {
+      t: grid,
+      tonnes: stepSeries(eng.unloadEvents, grid).map(r1),
+      plan: grid.map(g => r1(planTotal * g / hz)),
+      q_post: stepSeries(eng.qPost, grid),
+      q_kdrv: stepSeries(eng.qKdrv, grid),
+      q_loader: stepSeries(eng.qLoader, grid),
+    };
+    const tracks = eng.locos.map(l => l.states.map(s =>
+      [r1(s[0]), r1(s[1]), STATE_IDX[s[2]], r1(s[3]), r1(s[4]), s[5] ? 1 : 0, s[6]]));
+
+    const cycAn = K.cycleAnalytic(P);
+    const nodes = [];
+    for (let i = 0; i <= eng.nb; i++) nodes.push(i * eng.Lb);
+    const allCyc = allCycles;
+    return {
+      kind, params: P,
+      derived: {
+        v_ms: eng.v, v_kmh: eng.v * 3.6, L_block: eng.Lb, L_train: eng.Lp, cap_loop: eng.capLoop,
+        loss_accel: eng.lossA, loss_brake: eng.lossB, t_load_train: K.loadingTrainTime(P), cycle_analytic: cycAn,
+        windows: wins.map(w => [w[0], w[1]]), horizon: hz, t_eff_sum: tSum, n_shifts: nShifts, plan_total: planTotal,
+      },
+      kpi: {
+        trains, tonnes,
+        plan_pct: planTotal ? tonnes / planTotal : 0,
+        q_horizon: tonnes / (hz / 3600),
+        q_window: tSum ? tonnes / (tSum / 3600) : 0,
+        util_mean: perLoco.length ? sum(perLoco.map(p => p.util)) / perLoco.length : 0,
+        cycle_mean: allCyc.length ? sum(allCyc) / allCyc.length : null,
+        cycle_min: allCyc.length ? Math.min.apply(null, allCyc) : null,
+        cycle_max: allCyc.length ? Math.max.apply(null, allCyc) : null,
+        trains_needed: planTotal / (P.n_wagons * P.m_wag),
+      },
+      locos: perLoco,
+      waits,
+      resources: {
+        blocks: eng.blocks.map(B => tSum ? B.busy / tSum : 0),
+        posts: eng.postBusy.map(b => tSum ? b / tSum : 0),
+        loader: tSum ? eng.loaderBusy / (tSum * Math.trunc(P.n_loader)) : 0,
+        kdrv: tSum ? eng.kdrvBusy / tSum : 0,
+        q_post_max: maxOf(eng.qPost, x => x[1]),
+        q_kdrv_max: maxOf(eng.qKdrv, x => x[1]),
+        q_loader_max: maxOf(eng.qLoader, x => x[1]),
+      },
+      checks: {
+        loaded_total: eng.loadedTotal, unloaded_total: eng.unloadedTotal, in_transit: inTransit,
+        balance_diff: eng.loadedTotal - eng.unloadedTotal - inTransit, deadlock: eng.deadlock,
+      },
+      series, tracks, state_names: STATE_NAMES.slice(),
+      route: {
+        L_path: P.L_path, n_blocks: eng.nb, nodes, n_posts: Math.trunc(P.n_posts),
+        post_xy: [10036, 33512], kdrv_xy: [8156, 33295],
+        chord_m: Math.hypot(10036 - 8156, 33512 - 33295),
+      },
+    };
+  }
+
+  /* Схема без прогона: геометрия, кинематика, пропускная способность звеньев (sim/engine.py: scheme). */
+  function scheme(P) {
+    const v = K.speedMs(P.v_kmh, P.k_v);
+    const nb = Math.trunc(P.n_blocks);
+    const Lb = P.L_path / nb;
+    const n = Math.trunc(P.n_wagons);
+    const Lp = K.trainLength(P.L_loco, n, P.L_wag);
+    const cap = K.loopCapacity(P.L_razm, Lp, P.L_zap);
+    const la = K.accelLoss(v, P.a), lb = K.brakeLoss(v, P.b);
+    const tLoad = K.loadingTrainTime(P);
+    const cyc = K.cycleAnalytic(P);
+    const mTrain = n * P.m_wag;
+    const tEff = (P.T_sm - P.t_to_start - P.t_to_end) * P.ktg;
+    const tOcc = (Lb + Lp) / v;
+    const links = [
+      { key: 'locos', name: 'Электровозы Ferrit', rate: P.n_loco * 3600 / cyc, formula: 'n_ЭВ · 3600 / t_ц' },
+      { key: 'posts', name: 'Посты погрузки С-14, С-15', rate: P.n_posts * 3600 / tLoad, formula: 'n_пост · 3600 / t_погр.сост' },
+      { key: 'loader', name: 'ПДМ ST1030 №2', rate: P.n_loader * 3600 / (n * P.t_pdm), formula: 'n_ПДМ · 3600 / (n · t_ПДМ)' },
+      { key: 'kdrv', name: 'КДРВ №2', rate: 3600 / P.t_unload, formula: '3600 / t_разгр' },
+      { key: 'track', name: 'Блок-участок (два прохода за цикл)', rate: 3600 / (2 * tOcc), formula: '3600 / (2 · (L_б + L_п) / v)' },
+    ];
+    let low = links[0];
+    links.forEach(x => { if (x.rate < low.rate) low = x; });
+    const rateMin = low.rate;
+    const trainsRef = rateMin * tEff / 3600;
+    const nodes = [];
+    for (let i = 0; i <= nb; i++) nodes.push(i * Lb);
+    return {
+      params: P,
+      geometry: {
+        L_path: P.L_path, n_blocks: nb, L_block: Lb, nodes, L_train: Lp, L_razm: P.L_razm, cap_loop: cap,
+        n_posts: Math.trunc(P.n_posts), post_xy: [10036, 33512], kdrv_xy: [8156, 33295],
+        chord_m: Math.hypot(10036 - 8156, 33512 - 33295),
+      },
+      kinematics: {
+        v_ms: v, v_kmh: v * 3.6, loss_accel: la, loss_brake: lb, loss_stop: la + lb,
+        s_accel: K.accelPath(v, P.a), s_brake: K.brakePath(v, P.b), t_occ_block: tOcc,
+      },
+      times: {
+        t_load_train: tLoad, t_unload: P.t_unload, t_run_one_way: P.L_path / v + la + lb,
+        cycle_analytic: cyc, t_eff_shift: tEff, m_train: mTrain,
+      },
+      capacity: {
+        links, bottleneck: low.key, rate_min: rateMin,
+        required_rate: tEff > 0 ? P.plan_shift / (mTrain * tEff / 3600) : null,
+        trains_ref: trainsRef, tonnes_ref: trainsRef * mTrain, tail_trains: Math.trunc(P.n_posts),
+        plan_shift: P.plan_shift, plan_pct_ref: P.plan_shift ? trainsRef * mTrain / P.plan_shift : null,
+      },
+    };
+  }
+
+  return { GROUPS, defaults, meta, validate, simulate, scheme, makeWindows, STATE_NAMES, K };
+}));
+</script>
+<script>
+'use strict';
+const ENG = window.LG, D = ENG.defaults(), M = ENG.meta();
+const $ = s => document.querySelector(s);
+const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const fmt = (n, d = 0) => (n == null || !isFinite(n)) ? '—' : n.toLocaleString('ru-RU', { minimumFractionDigits: d, maximumFractionDigits: d });
+const pct = (x, d = 1) => fmt(x * 100, d) + ' %';
+
+const FIELDS = {
+  primary: [['n_loco', 'Электровозов в работе'], ['n_wagons', 'Вагонов в составе'], ['n_posts', 'Постов погрузки'], ['n_loader', 'ПДМ на погрузке'],
+    ['plan_shift', 'План руды в смену, т'], ['v_kmh', 'Паспортная скорость, км/ч'], ['L_path', 'Длина пути, м']],
+  secondary: [['k_v', 'Доля паспортной скорости'], ['t_pdm', 'Цикл ПДМ на вагон, с'], ['t_podacha', 'Подача вагона, с'], ['t_post', 'Постановка под погрузку, с'],
+    ['t_unload', 'Разгрузка на КДРВ, с'], ['ktg', 'КТГ электровозов'], ['m_wag', 'Груз в вагоне, т'], ['a', 'Ускорение, м/с²'], ['b', 'Замедление, м/с²'],
+    ['L_razm', 'Длина разминовки, м'], ['n_blocks', 'Блок-участков']],
+};
+const SRC = { n_loco: 'd', n_wagons: 'd', n_posts: 'd', n_loader: 'd', plan_shift: 'd', v_kmh: 'd', ktg: 'd', t_unload: 'd', m_wag: 'p', t_pdm: 'p', t_podacha: 'p', t_post: 'p',
+  a: 'p', L_path: 'a', k_v: 'a', b: 'a', L_razm: 'a', n_blocks: 'a' };
+const SRCN = { d: 'шахта', p: 'норматив', a: 'допущение' };
+const FIELD_KEYS = FIELDS.primary.concat(FIELDS.secondary).map(x => x[0]);
+
+function buildInputs() {
+  const mk = ([k, label]) => {
+    const m = M[k];
+    return `<div class="f"><label for="p_${k}">${esc(label)}</label><input id="p_${k}" data-k="${k}" type="text" inputmode="decimal" value="${m.value}" autocomplete="off">` +
+      `<div class="meta"><span class="tag ${SRC[k]}">${SRCN[SRC[k]]}</span><span id="e_${k}" class="errt"></span><span title="${esc(m.note || '')}">${esc(k === 'L_path' ? 'условная: пикетажа нет (A10)' : (m.note || '').slice(0, 54) + ((m.note || '').length > 54 ? '…' : ''))}</span></div></div>`;
+  };
+  $('#primary').innerHTML = FIELDS.primary.map(mk).join('');
+  $('#secondary').innerHTML = FIELDS.secondary.map(mk).join('');
+}
+
+let P = Object.assign({}, D), kind = 'shift', base = null, lastOk = null, timer = 0;
+
+function readInputs() {
+  const vals = {}, errs = {};
+  FIELD_KEYS.forEach(k => {
+    const el = $('#p_' + k), s = el.value.trim().replace(',', '.'), m = M[k];
+    const v = Number(s);
+    let e = '';
+    if (s === '' || !isFinite(v)) e = 'не число';
+    else if (v < m.min || v > m.max) e = `от ${m.min} до ${m.max}`;
+    else if (m.int && Math.abs(v - Math.round(v)) > 1e-9) e = 'целое';
+    $('#e_' + k).textContent = e; el.classList.toggle('err', !!e);
+    el.classList.toggle('chg', !e && Math.abs(v - D[k]) > 1e-12);
+    if (e) errs[k] = e; else vals[k] = m.int ? Math.round(v) : v;
+  });
+  return { vals, errs };
+}
+
+function sim(over, kd) {
+  const Q = Object.assign({}, P, over || {});
+  const clean = {};
+  for (const k of Object.keys(over || {})) { const m = M[k]; if (!m || Q[k] < m.min || Q[k] > m.max) return null; if (m.int) Q[k] = Math.round(Q[k]); }
+  try { return ENG.simulate(Q, kd || kind); } catch (e) { return null; }
+}
+
+function compute() {
+  const { vals, errs } = readInputs();
+  const bad = Object.keys(errs).length;
+  if (bad) {
+    const w = document.getElementById('errBox'); if (!w) $('#verdict').insertAdjacentHTML('afterbegin', '<div class="warnbox" id="errBox">Исправьте выделенные поля: расчёт показан по последним верным значениям.</div>');
+    if (lastOk) return;
+  } else { const w = document.getElementById('errBox'); if (w) w.remove(); }
+  P = Object.assign({}, D, vals, bad && lastOk ? lastOk.vals : {});
+  kind = $('#kind').value;
+  const R = ENG.simulate(P, kind), S = ENG.scheme(P);
+  lastOk = { vals: Object.assign({}, vals) };
+  const ctx = { R, S };
+  ctx.what = whatIf(R);
+  ctx.sens = sensitivity(R);
+  render(ctx);
+}
+
+/* ---------- сценарии «что если» ---------- */
+function whatIf(R) {
+  const t0 = R.kpi.tonnes;
+  const list = [
+    ['+1 электровоз', { n_loco: P.n_loco + 1 }], ['+1 ПДМ на погрузке', { n_loader: P.n_loader + 1 }], ['+1 пост погрузки', { n_posts: P.n_posts + 1 }],
+    ['Цикл ПДМ на вагон −10 %', { t_pdm: P.t_pdm * 0.9 }], ['Подача вагона −20 %', { t_podacha: P.t_podacha * 0.8 }],
+    ['Постановка под погрузку −20 %', { t_post: P.t_post * 0.8 }], ['Скорость хода +10 %', { k_v: Math.min(1, P.k_v * 1.1) }],
+    ['+1 вагон в составе', { n_wagons: P.n_wagons + 1 }], ['Разгрузка на КДРВ −20 %', { t_unload: P.t_unload * 0.8 }],
+  ];
+  const out = [];
+  list.forEach(([name, ov]) => {
+    const r = sim(ov); if (!r) { out.push({ name, na: true }); return; }
+    out.push({ name, t: r.kpi.tonnes, d: r.kpi.tonnes - t0, pp: r.kpi.plan_pct, util: r.kpi.util_mean });
+  });
+  out.sort((a, b) => (b.na ? -1e9 : b.d) - (a.na ? -1e9 : a.d));
+  return out;
+}
+
+/* ---------- чувствительность к допущениям: ±20 % ---------- */
+function sensitivity(R) {
+  const t0 = R.kpi.tonnes, rows = [];
+  [['k_v', 'Доля паспортной скорости'], ['t_pdm', 'Цикл ПДМ на вагон'], ['t_podacha', 'Подача вагона'], ['t_post', 'Постановка под погрузку'], ['t_unload', 'Разгрузка на КДРВ'],
+   ['L_path', 'Длина пути'], ['ktg', 'КТГ электровозов'], ['b', 'Замедление'], ['a', 'Ускорение'], ['L_razm', 'Длина разминовки'], ['n_blocks', 'Число блок-участков']].forEach(([k, name]) => {
+    const f = x => { const v = P[k] * x; const m = M[k]; const vv = m.int ? Math.round(v) : v; const r = sim({ [k]: Math.min(m.max, Math.max(m.min, vv)) }); return r ? r.kpi.tonnes - t0 : null; };
+    const lo = f(0.8), hi = f(1.2);
+    rows.push({ k, name, val: P[k], unit: '', src: SRC[k], lo, hi, mag: Math.max(Math.abs(lo || 0), Math.abs(hi || 0)) });
+  });
+  rows.sort((a, b) => b.mag - a.mag);
+  return rows;
+}
+
+/* ---------- отрисовка ---------- */
+function linkUtil(key, R) {
+  const r = R.resources;
+  if (key === 'locos') return R.kpi.util_mean;
+  if (key === 'posts') return r.posts.reduce((s, x) => s + x, 0) / r.posts.length;
+  if (key === 'loader') return r.loader;
+  if (key === 'kdrv') return r.kdrv;
+  return Math.max.apply(null, r.blocks);
+}
+const SHORT = { locos: 'Электровозы Ferrit', posts: 'Посты погрузки С-14, С-15', loader: 'ПДМ ST1030 №2', kdrv: 'КДРВ №2', track: 'Блок-участки пути' };
+
+function render(c) {
+  const { R, S } = c, k = R.kpi, d = R.derived, cap = S.capacity;
+  const pc = k.plan_pct, cls = pc >= 1 ? 'ok' : pc >= 0.9 ? 'warn' : 'bad';
+  const unitHours = d.horizon;                         // для подписи
+  const L = cap.links, low = L.find(x => x.key === cap.bottleneck);
+  const need = cap.required_rate;
+  const reserve = need ? low.rate / need - 1 : null;
+  const miss = d.plan_total - k.tonnes;
+  const best = c.what.find(x => !x.na && x.d > 1);
+  const trainMass = P.n_wagons * P.m_wag;
+  let txt = `За ${kind === 'shift' ? 'смену' : 'сутки'} выгружается ${fmt(k.tonnes)} т при плане ${fmt(d.plan_total)} т (${pct(pc)}). `;
+  txt += pc >= 1 ? 'План выполняется. ' : `Не хватает ${fmt(miss)} т (около ${fmt(miss / trainMass, 1)} состава). `;
+  txt += `Цепочку ограничивает ${SHORT[cap.bottleneck]}: ${fmt(low.rate, 2)} состава/ч при потребности ${fmt(need, 2)}`;
+  txt += reserve != null && reserve >= 0 ? ` (запас ${pct(reserve, 0)}).` : ` (нехватка ${pct(-reserve, 0)}).`;
+  if (best) txt += ` Самый сильный шаг: «${best.name}», +${fmt(best.d)} т (${pct(best.pp)} плана).`;
+  else if (pc < 1) txt += ' Ни одно из проверенных изменений не закрывает план, нужны другие меры.';
+  const bd = base ? k.tonnes - base.tonnes : null;
+  const dl = (x, unit) => x == null ? '' : `<div class="delta ${x > 0.5 ? 'up' : x < -0.5 ? 'dn' : ''}">к базе ${x > 0 ? '+' : ''}${fmt(x, unit === '%' ? 1 : 0)} ${unit}</div>`;
+  const dlt = base ? dl(bd, 'т') : '';
+  const ok = Math.abs(R.checks.balance_diff) < 1e-6 && !R.checks.deadlock;
+  $('#verdict').innerHTML = (document.getElementById('errBox') ? '<div class="warnbox" id="errBox">Исправьте выделенные поля: расчёт показан по последним верным значениям.</div>' : '') +
+    `<div class="vhead"><span class="pill ${cls}">${pc >= 1 ? 'План выполняется' : pc >= 0.9 ? 'План под угрозой' : 'План не выполняется'}</span>` +
+    `<span class="note">имитация движения составов, ${kind === 'shift' ? 'одна смена' : 'сутки'}; проверки модели ${ok ? 'пройдены (баланс массы, блокировок нет)' : '<b>не пройдены</b>'}</span></div>` +
+    `<p class="vtext">${esc(txt)}</p>` +
+    `<div class="tiles">` +
+    `<div class="tile ${cls}"><div class="v">${fmt(k.tonnes)} т</div><div class="l">выгружено на КДРВ №2</div>${dlt}</div>` +
+    `<div class="tile ${cls}"><div class="v">${pct(pc)}</div><div class="l">план ${fmt(d.plan_total)} т</div>${base ? dl((pc - base.plan_pct) * 100, '%') : ''}</div>` +
+    `<div class="tile"><div class="v">${fmt(k.trains)}</div><div class="l">составов, нужно ${fmt(k.trains_needed, 1)}</div></div>` +
+    `<div class="tile"><div class="v">${fmt(k.q_window, 0)} т/ч</div><div class="l">в окне работы</div></div>` +
+    `<div class="tile"><div class="v">${pct(k.util_mean, 0)}</div><div class="l">загрузка электровозов</div></div></div>` +
+    `<p class="note" style="margin:0">Оценка без очередей (верхняя граница): ${fmt(cap.tonnes_ref * (kind === 'shift' ? 1 : 2))} т. Разница с имитацией ${fmt(cap.tonnes_ref * (kind === 'shift' ? 1 : 2) - k.tonnes)} т — потери на ожидания.</p>`;
+  renderBottleneck(c);
+  renderWhat(c);
+  renderAssume(c);
+  renderRoute(c);
+  $('#report').value = reportText(c, txt);
+  renderAbout();
+}
+
+function renderBottleneck(c) {
+  const { R, S } = c, L = S.capacity.links, need = S.capacity.required_rate;
+  const scale = Math.max(need * 2.2, 1);
+  let h = '<div class="bars">';
+  L.forEach(x => {
+    const hot = x.key === S.capacity.bottleneck, u = linkUtil(x.key, R);
+    h += `<div class="bar${hot ? ' hot' : ''}"><div class="nm">${esc(SHORT[x.key])}${hot ? ' · узкое место' : ''}<div class="note">${esc(x.formula)}</div></div>` +
+      `<div class="track" role="img" aria-label="${esc(SHORT[x.key])}: ${fmt(x.rate, 2)} состава в час"><div class="fill" style="width:${Math.min(100, x.rate / scale * 100)}%"></div><div class="need" style="left:${Math.min(100, need / scale * 100)}%" title="потребность"></div></div>` +
+      `<div class="val">${fmt(x.rate, 2)} сост./ч<div class="note">занят ${pct(u, 0)}</div></div></div>`;
+  });
+  h += `</div><p class="legend">Чёрная метка: потребность для плана, ${fmt(need, 2)} состава/ч. Шкала обрезана, КДРВ №2 пропускает ${fmt(L.find(x => x.key === 'kdrv').rate, 0)} сост./ч. «Занят» — доля времени ресурса по имитации.</p>`;
+  // состав цикла
+  const t = S.times, la = S.kinematics;
+  const run = t.t_run_one_way, load = t.t_load_train, un = t.t_unload;
+  const cyc = R.kpi.cycle_mean, an = t.cycle_analytic, wait = cyc != null ? Math.max(0, cyc - an) : 0;
+  const seg = [['Погрузка', load, 'var(--accent)'], ['Груженый ход', run, '#4f8fb3'], ['Разгрузка', un, '#8aa7b8'], ['Порожний ход', run, '#6aa6c6'], ['Ожидания в имитации', wait, 'var(--bad)']];
+  const tot = seg.reduce((s, x) => s + x[1], 0);
+  h += `<h3>Из чего состоит цикл электровоза</h3><div class="cyc" role="img" aria-label="Состав цикла">${seg.map(x => `<span style="width:${x[1] / tot * 100}%;background:${x[2]}" title="${x[0]}: ${fmt(x[1] / 60, 1)} мин"></span>`).join('')}</div>` +
+    `<div class="cl">${seg.map(x => `<span><i style="background:${x[2]}"></i>${x[0]} ${fmt(x[1] / 60, 1)} мин</span>`).join('')}</div>`;
+  const wt = R.waits.slice().sort((a, b) => b.total - a.total).filter(w => w.total > 0);
+  const sumW = P.n_loco * R.derived.t_eff_sum;
+  h += `<p class="note">Цикл по формуле: ${fmt(an / 60, 1)} мин. В имитации средний цикл ${cyc != null ? fmt(cyc / 60, 1) : '—'} мин. ` +
+    (wt.length ? 'Главные ожидания: ' + wt.slice(0, 3).map(w => `${esc(w.state)} ${pct(w.total / sumW, 0)} времени электровозов`).join(', ') + '.' : 'Ожиданий нет.') + '</p>';
+  $('#bottleneck').innerHTML = h;
+}
+
+function renderWhat(c) {
+  const t0 = c.R.kpi.tonnes, plan = c.R.derived.plan_total;
+  let h = '<div class="scroll"><table><thead><tr><th>Изменение</th><th>Выгрузка, т</th><th>Δ, т</th><th>План</th><th class="l">Эффект</th></tr></thead><tbody>';
+  const mx = Math.max.apply(null, c.what.filter(x => !x.na).map(x => Math.abs(x.d)).concat([1]));
+  const bestName = (c.what.find(x => !x.na && x.d > 1) || {}).name;
+  c.what.forEach(w => {
+    if (w.na) { h += `<tr><td class="l">${esc(w.name)}</td><td colspan="4" class="l note">вне допустимых границ параметра</td></tr>`; return; }
+    const w2 = Math.min(100, Math.abs(w.d) / mx * 100);
+    h += `<tr class="${w.name === bestName ? 'best' : ''}"><td class="l">${esc(w.name)}</td><td class="num">${fmt(w.t)}</td><td class="num">${w.d >= 0 ? '+' : ''}${fmt(w.d)}</td><td class="num">${pct(w.pp)}</td>` +
+      `<td class="l"><div class="mini"><b style="left:0;width:${w2}%;background:${w.d > 1 ? 'var(--ok)' : w.d < -1 ? 'var(--bad)' : 'var(--line)'}"></b></div>${Math.abs(w.d) < 1 ? '<span class="note">не влияет: ограничивает другое звено</span>' : ''}</td></tr>`;
+  });
+  h += `</tbody></table></div><p class="note">Каждая строка — отдельный пересчёт имитации с одним изменённым параметром относительно текущих значений (${fmt(t0)} т, ${pct(t0 / plan)} плана). Строка «не влияет» показывает, что пока не снято текущее узкое место, это изменение не помогает.</p>`;
+  $('#whatif').innerHTML = h;
+}
+
+function renderAssume(c) {
+  const mx = Math.max.apply(null, c.sens.map(x => x.mag).concat([1]));
+  let h = '<p class="note" style="margin-top:0">Что будет с выгрузкой, если допущение окажется на 20 % меньше или больше. Сверху допущения с наибольшим влиянием: их нужно подтвердить в первую очередь.</p>' +
+    '<div class="scroll"><table><thead><tr><th>Параметр</th><th>Значение</th><th>Источник</th><th>−20 %</th><th>+20 %</th><th class="l">Влияние</th></tr></thead><tbody>';
+  c.sens.forEach(x => {
+    const w = x.mag / mx * 100;
+    h += `<tr><td class="l">${esc(x.name)}</td><td class="num">${fmt(x.val, x.val < 5 ? 3 : 1)}</td><td><span class="tag ${x.src}">${SRCN[x.src]}</span></td>` +
+      `<td class="num">${x.lo == null ? '—' : (x.lo >= 0 ? '+' : '') + fmt(x.lo) + ' т'}</td><td class="num">${x.hi == null ? '—' : (x.hi >= 0 ? '+' : '') + fmt(x.hi) + ' т'}</td>` +
+      `<td class="l"><div class="mini"><b style="left:0;width:${w}%;background:${x.mag < 1 ? 'var(--line)' : x.src === 'a' ? 'var(--warn)' : 'var(--accent)'}"></b></div></td></tr>`;
+  });
+  h += '</tbody></table></div><h3>Допущения модели, которые не задаются числом</h3><ul class="plain">' +
+    '<li><b>Порожний состав возвращается по той же трассе в обратном порядке.</b> Рельсового графа гор. −480 нет, отдельные порожняковые ветви не подключены (вопросы A10, G1).</li>' +
+    '<li><b>Длина пути 2400 м условная.</b> Плечи между узлами пропорциональны хордам по плану (вопрос A10), фактический пикетаж нужен от маркшейдера.</li>' +
+    '<li><b>Скорость одинакова на всём пути</b> и для груженого, и для порожнего; уклон и масса состава на неё не влияют (вопрос C).</li>' +
+    '<li><b>Погрузку выполняет одна ПДМ ST1030 №2</b> на оба поста, время вагона из хронометража 1,47 мин при плече 15 м; плечо 60 м не учтено.</li>' +
+    '<li><b>Руда из карманов не ограничена:</b> подвоз с С-1 и объёмы карманов не моделируются (вопрос A3).</li>' +
+    '<li><b>Породные составы проходки</b> в этом расчёте не учитываются, рудные составы идут одни.</li></ul>';
+  $('#assume').innerHTML = h;
+}
+
+const ROUTE = [
+  ['Карман С-14 (порода), пост погрузки', 9385.2, 33757.3], ['Камера разъезда (перегрузки)', 9354.6, 33787.6], ['Откаточный штрек западный', 9168.0, 33782.5],
+  ['Заезд 9/52', 8857.3, 33859.0], ['Грузовой квершлаг 1', 8691.5, 33784.9], ['Съезд на обгонную выработку', 8295.0, 33554.4],
+  ['Грузовая ветвь опрокида №2', 8271.9, 33499.8], ['Заезд на ил-ник и во-к', 8233.2, 33446.3], ['Заезд на камеру опрокидывателя №2 (КДРВ №2)', 8156.3, 33295.1],
+];
+function renderRoute(c) {
+  const v = P.v_kmh * P.k_v / 3.6, ta = v / (2 * P.a), tb = v / (2 * P.b);
+  const chord = []; let sum = 0;
+  for (let i = 1; i < ROUTE.length; i++) { const l = Math.hypot(ROUTE[i][1] - ROUTE[i - 1][1], ROUTE[i][2] - ROUTE[i - 1][2]); chord.push(l); sum += l; }
+  const kk = P.L_path / sum, legs = chord.map(l => l * kk), nb = Math.trunc(P.n_blocks), Lb = P.L_path / nb;
+  const cum = [0]; legs.forEach((l, i) => cum.push(cum[i] + l));
+  const row = (n, name, leg, pos, tm, blk) => `<tr><td>${n}</td><td class="l">${esc(name)}</td><td class="num">${leg == null ? '—' : fmt(leg, 0)}</td><td class="num">${fmt(pos, 0)}</td><td class="num">${blk}</td><td class="num">${fmt(tm, 0)}</td></tr>`;
+  const head = '<thead><tr><th>№</th><th class="l">Узел по чертежу</th><th>Плечо, м</th><th>Пройдено, м</th><th>Блок</th><th>Время, с</th></tr></thead>';
+  const blk = x => Math.min(nb, Math.floor(x / Lb) + 1);
+  let g = '<tr><td colspan="6" class="l"><b>Груженый: С-14 → КДРВ №2</b> (разгон ' + fmt(ta, 1) + ' с в начале, торможение ' + fmt(tb, 1) + ' с в конце)</td></tr>';
+  g += row(0, ROUTE[0][0], null, 0, ta, 1);
+  for (let i = 1; i < ROUTE.length; i++) g += row(i, ROUTE[i][0], legs[i - 1], cum[i], ta + cum[i] / v + (i === ROUTE.length - 1 ? tb : 0), blk(Math.min(cum[i], P.L_path - 1e-6)));
+  const n = ROUTE.length; let e = '<tr><td colspan="6" class="l"><b>Порожний: КДРВ №2 → С-14</b> (тот же путь в обратном порядке)</td></tr>';
+  e += row(0, ROUTE[n - 1][0], null, 0, ta, nb);
+  for (let j = 1; j < n; j++) { const i = n - 1 - j, pos = P.L_path - cum[i]; e += row(j, ROUTE[i][0], legs[i], pos, ta + pos / v + (j === n - 1 ? tb : 0), blk(Math.min(cum[i], P.L_path - 1e-6))); }
+  // схема
+  const xs = ROUTE.map(r => r[1]), ys = ROUTE.map(r => r[2]), x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs), y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
+  const W = 720, H = 300, pad = 30, sc = Math.min((W - 2 * pad) / (x1 - x0), (H - 2 * pad) / (y1 - y0));
+  const px = x => pad + (x - x0) * sc, py = y => H - pad - (y - y0) * sc;
+  const pts = ROUTE.map(r => px(r[1]).toFixed(1) + ',' + py(r[2]).toFixed(1)).join(' ');
+  let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Схема трассы электровозов"><polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linejoin="round"/>`;
+  ROUTE.forEach((r, i) => { const cx = px(r[1]), cy = py(r[2]); const end = i === 0 || i === ROUTE.length - 1;
+    svg += `<circle cx="${cx}" cy="${cy}" r="${end ? 9 : 7}" fill="${i === 0 ? 'var(--ok)' : i === ROUTE.length - 1 ? 'var(--bad)' : 'var(--panel)'}" stroke="var(--accent)" stroke-width="2"/><text x="${cx}" y="${cy + 3.5}" text-anchor="middle" style="${end ? 'fill:#fff;' : ''}font-weight:600">${i}</text>`; });
+  svg += `<text x="${W - 8}" y="${H - 8}" text-anchor="end" style="fill:var(--muted)">схема по меткам плана, прямые между узлами; север вверху</text></svg>`;
+  $('#route').innerHTML = svg + `<p class="note">Пост погрузки (0, зелёный) → разгрузка (8, красный). Длина пути ${fmt(P.L_path, 0)} м = сумма хорд ${fmt(sum, 0)} м × k ${fmt(kk, 3)}. Блок-участок ${fmt(Lb, 0)} м, скорость ${fmt(v * 3.6, 1)} км/ч.</p>` +
+    `<details class="box"><summary>Пошаговый расчёт хода: груженый и порожний</summary><div class="scroll"><table>${head}<tbody>${g}${e}</tbody></table></div>` +
+    `<p class="note">Время узла = t<sub>a</sub> + пройдено / v, где t<sub>a</sub> = v / (2a); в конце добавляется t<sub>b</sub> = v / (2b). Ход в одну сторону ${fmt(P.L_path / v + ta + tb, 1)} с.</p></details>`;
+}
+
+function reportText(c, txt) {
+  const { R, S } = c, k = R.kpi, d = R.derived, cap = S.capacity, t = S.times;
+  const L = [];
+  L.push('ГОР. −480: РАСЧЁТ ЛОГИСТИЧЕСКОЙ ЦЕПОЧКИ (электровозы Ferrit, С-14 и С-15 → КДРВ №2)');
+  L.push(`Горизонт расчёта: ${kind === 'shift' ? 'смена 10,2 ч' : 'сутки, 2 смены'}`);
+  L.push('');
+  L.push('ИТОГ'); L.push(txt);
+  L.push(`Составов ${fmt(k.trains)} (нужно ${fmt(k.trains_needed, 1)}), производительность в окне ${fmt(k.q_window, 0)} т/ч, загрузка электровозов ${pct(k.util_mean, 0)}.`);
+  L.push(`Цикл электровоза по формуле ${fmt(t.cycle_analytic / 60, 1)} мин, в имитации ${k.cycle_mean != null ? fmt(k.cycle_mean / 60, 1) : '—'} мин.`);
+  L.push('');
+  L.push('ПРОПУСКНАЯ СПОСОБНОСТЬ ЗВЕНЬЕВ (состав/ч, потребность ' + fmt(cap.required_rate, 2) + ')');
+  cap.links.forEach(x => L.push(`  ${SHORT[x.key]}: ${fmt(x.rate, 2)}${x.key === cap.bottleneck ? '  <- узкое место' : ''}; занят ${pct(linkUtil(x.key, R), 0)}`));
+  L.push('');
+  L.push('ЧТО ДАСТ ИЗМЕНЕНИЕ (выгрузка за ' + (kind === 'shift' ? 'смену' : 'сутки') + ')');
+  c.what.forEach(w => L.push(`  ${w.name}: ${w.na ? 'вне границ' : fmt(w.t) + ' т (' + (w.d >= 0 ? '+' : '') + fmt(w.d) + ' т)'}`));
+  L.push('');
+  L.push('ПАРАМЕТРЫ');
+  FIELD_KEYS.forEach(kk => L.push(`  ${M[kk].label}: ${fmt(P[kk], P[kk] < 5 && !M[kk].int ? 3 : 1)} ${M[kk].unit || ''}${Math.abs(P[kk] - D[kk]) > 1e-12 ? '  (изменено, было ' + D[kk] + ')' : ''}  [${SRCN[SRC[kk]]}]`));
+  L.push('');
+  L.push('ДОПУЩЕНИЯ С НАИБОЛЬШИМ ВЛИЯНИЕМ (±20 %)');
+  c.sens.slice(0, 5).forEach(x => L.push(`  ${x.name}: ${x.lo == null ? '—' : fmt(x.lo)} / ${x.hi == null ? '—' : '+' + fmt(x.hi)} т`));
+  L.push('  Порожний состав идёт по тому же пути, что и груженый; длина пути условная (A10, G1); скорость постоянна на всём пути; руда в карманах не ограничена.');
+  return L.join('\n');
+}
+
+function renderAbout() {
+  $('#about').innerHTML = '<div class="scroll"><table><thead><tr><th class="l">Что нужно пользователю</th><th class="l">Прежняя версия</th><th class="l">Эта версия</th></tr></thead><tbody>' +
+    '<tr><td class="l">Первый результат по гор. −480</td><td class="l">Открыть «Электровозы», нажать «Рассчитать»: 2 действия, перед этим на странице идут справочные карточки</td><td class="l">0 действий: расчёт выполнен при открытии</td></tr>' +
+    '<tr><td class="l">Где видно узкое место</td><td class="l">«Схема» (оценка по формулам) и «Показатели» (ожидания): ещё 2 страницы</td><td class="l">Рядом с итогом, формульная оценка и загрузка по имитации вместе</td></tr>' +
+    '<tr><td class="l">Сценарий «что если»</td><td class="l">Справочник → найти параметр среди 200 → правка → сохранить → «Электровозы» → «Рассчитать» → «Схема»: около 8 действий</td><td class="l">1 действие: правка поля, пересчёт мгновенный; готовые сценарии посчитаны сразу</td></tr>' +
+    '<tr><td class="l">Допущения</td><td class="l">Разбросаны по справочнику, справке и списку вопросов</td><td class="l">Рядом с итогом, с влиянием ±20 % на выгрузку и метками источника</td></tr>' +
+    '<tr><td class="l">Результат для передачи</td><td class="l">Нет единого отчёта, данные на 4 страницах</td><td class="l">Один текстовый отчёт кнопкой</td></tr>' +
+    '<tr><td class="l">Экранов на задачу</td><td class="l">4–5</td><td class="l">1</td></tr></tbody></table></div>' +
+    '<p class="note">Число действий оценено по структуре экранов прежней версии, замеров по секундомеру не было. Расчётное ядро то же: имитация движения составов и аналитическая схема версии 0.11.1, значения по умолчанию совпадают. Прежняя версия не менялась.</p>' +
+    '<details class="box"><summary>Чего в этой версии нет по сравнению с прежней</summary><ul class="plain"><li>Блоки −402 и АТУ, ПДМ и самосвалы, проходка, скреперная добыча, добыча подэтажным обрушением.</li><li>Анимация, графики и редактирование узлов трассы.</li><li>Суточное планирование и роли администратора.</li><li>Хранение данных на устройстве и офлайн-режим: значения живут только до закрытия страницы.</li></ul><p class="note">Если вариант подходит, эти разделы остаются в основной версии, а быстрый расчёт добавляется отдельной главной страницей.</p></details>';
+}
+
+/* ---------- события ---------- */
+function schedule() { clearTimeout(timer); timer = setTimeout(() => { compute(); }, 120); }
+function init() {
+  buildInputs();
+  document.addEventListener('input', e => { if (e.target.matches('#primary input, #secondary input')) schedule(); });
+  $('#kind').addEventListener('change', compute);
+  $('#btnReset').onclick = () => { FIELD_KEYS.forEach(k => { $('#p_' + k).value = D[k]; }); lastOk = null; compute(); };
+  $('#btnBase').onclick = () => { base = ENG.simulate(P, kind).kpi; $('#baseNote').textContent = `База зафиксирована: ${fmt(base.tonnes)} т, ${pct(base.plan_pct)} плана. Дальше показана разница.`; compute(); };
+  $('#btnCopy').onclick = async () => {
+    const ta = $('#report'); ta.focus(); ta.select();
+    try { await navigator.clipboard.writeText(ta.value); $('#copyMsg').textContent = 'Скопировано'; } catch (e) { $('#copyMsg').textContent = 'Текст выделен, скопируйте клавишами Ctrl+C'; }
+  };
+  compute();
+}
+init();
+</script>
+</body>
+</html>

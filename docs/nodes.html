@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Узлы · Логистика гор. −480</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%231f6fb5'/%3E%3Cpath d='M3 11h10M5 11V6h6v5' stroke='white' fill='none' stroke-width='1.5'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1f6fb5">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Логистика">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+</head>
+<body data-page="nodes">
+<main id="page">
+<h1>Узлы, плечи и выработки гор. −480</h1>
+<p class="lead">Наименования узлов взяты с чертежа «Рабочий план гор. −480». Трасса электровозов соединяет подписанные узлы прямыми отрезками: порядок узлов по плану, точная геометрия выработок не восстанавливается (нет связного графа, вопрос A10).</p>
+<section class="card">
+  <div class="row"><label>Вид схемы <select id="ndView"><option value="route">Трасса электровозов</option><option value="all">Весь план</option></select></label>
+  <a class="btn" href="animation.html">← К анимации</a></div>
+  <canvas id="cvNodes" class="cv" aria-label="Схема узлов гор. −480"></canvas>
+</section>
+<div id="ndOut"></div>
+</main>
+<script src="js/blocks.js"></script>
+<script src="js/scraper.js"></script>
+<script src="js/plan480.js"></script>
+<script src="js/params-data.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/local-api.js"></script>
+<script src="js/pwa.js"></script>
+<script src="js/updater.js"></script>
+<script src="js/common.js"></script>
+<script src="js/draw.js"></script>
+<script src="js/p-nodes.js"></script>
+</body>
+</html>

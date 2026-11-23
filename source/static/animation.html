@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Анимация · Логистика гор. −480</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%231f6fb5'/%3E%3Cpath d='M3 11h10M5 11V6h6v5' stroke='white' fill='none' stroke-width='1.5'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="animation">
+<main id="page">
+<h1>Анимация</h1>
+<p class="lead">Движение составов по маршруту: оранжевый — гружёный, синий — порожний, красная рамка — ожидание. Время можно менять ползунком, кнопками и клавишами.</p>
+<div id="animEmpty" class="empty" hidden><p>Нет результата расчёта.</p><a class="btn primary" href="locos.html">Перейти к расчёту</a></div>
+<div id="animBox" hidden>
+  <div class="row mb">
+    <label>Схема <select id="anView"><option value="route">Трасса электровозов по чертежу −480</option><option value="all">Весь план −480</option><option value="line">Линейная схема (модель)</option></select></label>
+    <a class="btn" id="btnNodes" href="nodes.html">Узлы</a>
+  </div>
+  <canvas id="cvPlan" class="cv" aria-label="Схема трассы по чертежу гор. −480"></canvas>
+  <canvas id="cvAnim" class="cv" aria-label="Схема движения составов"></canvas>
+  <div class="player">
+    <button id="btnPlay" class="btn primary" type="button">▶ Пуск</button>
+    <button id="btnStepBack" class="btn" type="button" title="назад на 1 минуту">−1 мин</button>
+    <button id="btnStepFwd" class="btn" type="button" title="вперёд на 1 минуту">+1 мин</button>
+    <button id="btnNextEv" class="btn" type="button" title="к следующему событию">Событие ▸</button>
+    <label class="speed">Скорость <input id="speed" type="range" min="0" max="100" value="78"> <b id="speedVal">×600</b></label>
+    <span class="clock">Время: <b id="clock">00:00:00</b> из <span id="clockEnd">00:00:00</span></span>
+  </div>
+  <input id="timeline" type="range" min="0" max="1000" value="0" aria-label="Положение по времени">
+  <p class="hint" id="planInfo"></p>
+  <div id="legend" class="legend"></div>
+  <p class="hint">Клавиши: <kbd>Пробел</kbd> пуск и пауза, <kbd>←</kbd> <kbd>→</kbd> шаг на минуту, <kbd>Enter</kbd> к следующему событию.</p>
+  <h2 class="sec">Электровозы в выбранный момент</h2>
+  <div class="scroll"><table><thead><tr><th>ЭВ</th><th class="l">Состояние</th><th>Положение от постов, м</th><th class="l">Груз</th></tr></thead><tbody id="liveBody"></tbody></table></div>
+</div>
+</main>
+<script src="js/blocks.js"></script>
+<script src="js/plan480.js"></script>
+<script src="js/common.js"></script>
+<script src="js/draw.js"></script>
+<script src="js/p-animation.js"></script>
+</body>
+</html>

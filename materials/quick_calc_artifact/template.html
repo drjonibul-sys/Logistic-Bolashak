@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Быстрый расчёт гор. −480</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+/* Палитра: сталь и сигнальный янтарь (маркировка выработок). Схема: слева панель параметров, справа итог сверху вниз. */
+:root {
+  --bg: #eef1f4; --panel: #ffffff; --ink: #17212b; --muted: #566472; --line: #d5dce3;
+  --accent: #0b5d8a; --accent-soft: #e1eef6;
+  --ok: #1b7a4b; --ok-bg: #e3f3ea; --warn: #9a5b00; --warn-bg: #fff2d6; --bad: #b3261e; --bad-bg: #fbe5e3;
+  --font: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #11171d; --panel: #1a232c; --ink: #e6ecf1; --muted: #9aa8b5; --line: #2c3945;
+  --accent: #62b3e3; --accent-soft: #1d3342;
+  --ok: #5ccf92; --ok-bg: #173226; --warn: #f0b24d; --warn-bg: #3a2d12; --bad: #ff8a80; --bad-bg: #3b1d1b; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #11171d; --panel: #1a232c; --ink: #e6ecf1; --muted: #9aa8b5; --line: #2c3945;
+  --accent: #62b3e3; --accent-soft: #1d3342;
+  --ok: #5ccf92; --ok-bg: #173226; --warn: #f0b24d; --warn-bg: #3a2d12; --bad: #ff8a80; --bad-bg: #3b1d1b; color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--font); }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 20px 16px 48px; }
+header.top { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; justify-content: space-between; margin-bottom: 16px; }
+h1 { font-size: 24px; line-height: 1.2; margin: 0; text-wrap: balance; }
+.sub { color: var(--muted); font-size: 13.5px; }
+.badge-prev { font: 500 12px var(--mono); background: var(--warn-bg); color: var(--warn); padding: 3px 8px; border-radius: 99px; }
+.grid { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 880px) { .grid { grid-template-columns: minmax(0, 1fr); } .side { position: static !important; max-height: none !important; } }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+.card + .card, .stack > .card + .card { margin-top: 16px; }
+.stack, .card { min-width: 0; }
+.side { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow: auto; }
+h2 { font-size: 16px; margin: 0 0 12px; text-wrap: balance; }
+h3 { font-size: 14px; margin: 16px 0 8px; }
+.f { display: grid; grid-template-columns: 1fr 96px; gap: 2px 8px; align-items: center; margin-bottom: 10px; }
+.f label { font-size: 13.5px; }
+.f input, .f select { font: 500 14px var(--mono); width: 100%; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); text-align: right; }
+.f input:focus-visible, .f select:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.f input.chg { border-color: var(--accent); background: var(--accent-soft); }
+.f input.err { border-color: var(--bad); }
+.f .meta { grid-column: 1 / -1; display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--muted); min-height: 16px; }
+.tag { font-size: 11px; padding: 0 6px; border-radius: 99px; border: 1px solid var(--line); white-space: nowrap; }
+.tag.d { color: var(--ok); border-color: var(--ok); } .tag.a { color: var(--warn); border-color: var(--warn); } .tag.p { color: var(--accent); border-color: var(--accent); }
+.errt { color: var(--bad); }
+.btnrow { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+button { font: 500 13.5px var(--font); padding: 7px 12px; border-radius: 7px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+details > summary { cursor: pointer; font-weight: 500; padding: 6px 0; }
+details.box { border: 1px solid var(--line); border-radius: 8px; padding: 0 12px; margin-top: 12px; }
+details.box[open] { padding-bottom: 12px; }
+.verdict { display: grid; gap: 14px; }
+.vhead { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.pill { font-weight: 600; padding: 4px 12px; border-radius: 99px; font-size: 14px; }
+.pill.ok { background: var(--ok-bg); color: var(--ok); } .pill.warn { background: var(--warn-bg); color: var(--warn); } .pill.bad { background: var(--bad-bg); color: var(--bad); }
+.vtext { font-size: 15.5px; margin: 0; max-width: 70ch; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.tile { border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.tile.ok { border-left-color: var(--ok); } .tile.warn { border-left-color: var(--warn); } .tile.bad { border-left-color: var(--bad); }
+.tile .v { font: 500 22px var(--mono); font-variant-numeric: tabular-nums; }
+.tile .l { font-size: 12.5px; color: var(--muted); }
+.delta { font: 500 12px var(--mono); color: var(--muted); }
+.delta.up { color: var(--ok); } .delta.dn { color: var(--bad); }
+.bars { display: grid; gap: 10px; }
+.bar { display: grid; grid-template-columns: minmax(130px, 220px) 1fr 120px; gap: 10px; align-items: center; font-size: 13.5px; }
+@media (max-width: 600px) { .bar { grid-template-columns: 1fr; gap: 3px; } }
+.track { position: relative; height: 18px; background: var(--bg); border-radius: 4px; }
+.fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; background: var(--accent); }
+.bar.hot .fill { background: var(--bad); } .bar.hot .nm { font-weight: 600; color: var(--bad); }
+.need { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); }
+.val { font: 500 13px var(--mono); text-align: right; font-variant-numeric: tabular-nums; }
+.legend { font-size: 12.5px; color: var(--muted); margin-top: 8px; }
+.cyc { display: flex; height: 26px; border-radius: 5px; overflow: hidden; margin: 8px 0; }
+.cyc span { display: block; height: 100%; }
+.cl { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--muted); }
+.cl i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+th, td { padding: 7px 8px; border-bottom: 1px solid var(--line); text-align: right; vertical-align: top; }
+th { font-weight: 600; color: var(--muted); font-size: 12.5px; }
+th:first-child, td:first-child, td.l, th.l { text-align: left; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+tr.best td { background: var(--ok-bg); }
+.scroll { overflow-x: auto; }
+.mini { height: 8px; background: var(--bg); border-radius: 3px; position: relative; min-width: 120px; }
+.mini b { position: absolute; top: 0; bottom: 0; border-radius: 3px; }
+ul.plain { margin: 6px 0 0; padding-left: 18px; } ul.plain li { margin: 3px 0; }
+textarea { width: 100%; min-height: 220px; font: 13px/1.45 var(--mono); background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+svg text { fill: var(--ink); font: 11px var(--font); }
+.note { font-size: 12.5px; color: var(--muted); }
+.warnbox { background: var(--warn-bg); color: var(--warn); border-radius: 8px; padding: 8px 12px; font-size: 13.5px; }
+@media (prefers-reduced-motion: no-preference) { .fill, .mini b { transition: width .2s; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+  <div>
+    <h1>Быстрый расчёт гор. −480</h1>
+    <div class="sub">Электровозы Ferrit, погрузка С-14 и С-15, разгрузка КДРВ №2. Расчёт идёт сам при каждой правке.</div>
+  </div>
+  <span class="badge-prev">вариант для согласования</span>
+</header>
+
+<div class="grid">
+  <aside class="side card" aria-label="Параметры">
+    <h2>Параметры</h2>
+    <div class="f"><label for="kind">Горизонт</label>
+      <select id="kind"><option value="shift">Смена, 10,2 ч</option><option value="day">Сутки, 2 смены</option></select></div>
+    <div id="primary"></div>
+    <details class="box" id="secWrap"><summary>Ещё параметры цикла</summary><div id="secondary"></div></details>
+    <div class="btnrow">
+      <button id="btnBase" type="button">Зафиксировать как базу</button>
+      <button id="btnReset" type="button">К данным шахты</button>
+    </div>
+    <p class="note" id="baseNote"></p>
+    <p class="note">Метки: <span class="tag d">шахта</span> данные шахты, <span class="tag p">норматив</span> раздел модели, <span class="tag a">допущение</span> нужно подтвердить.</p>
+  </aside>
+
+  <main class="stack">
+    <section class="card verdict" id="verdict" aria-live="polite"></section>
+    <section class="card"><h2>Узкое место</h2><div id="bottleneck"></div></section>
+    <section class="card"><h2>Что даст изменение</h2><div id="whatif"></div></section>
+    <section class="card"><h2>Допущения и их влияние</h2><div id="assume"></div></section>
+    <section class="card"><h2>Маршрут по узлам</h2><div id="route"></div></section>
+    <section class="card"><h2>Отчёт</h2>
+      <p class="note" style="margin-top:0">Сводка одним текстом: параметры, итог, узкое место, допущения.</p>
+      <div class="btnrow" style="margin:0 0 10px"><button class="primary" id="btnCopy" type="button">Скопировать отчёт</button><span class="note" id="copyMsg"></span></div>
+      <textarea id="report" readonly aria-label="Текст отчёта"></textarea></section>
+    <section class="card"><h2>Что изменилось по сравнению с прежней версией</h2><div id="about"></div></section>
+  </main>
+</div>
+</div>
+
+<script>/*PARAMS*/</script>
+<script>/*ENGINE*/</script>
+<script>
+'use strict';
+const ENG = window.LG, D = ENG.defaults(), M = ENG.meta();
+const $ = s => document.querySelector(s);
+const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const fmt = (n, d = 0) => (n == null || !isFinite(n)) ? '—' : n.toLocaleString('ru-RU', { minimumFractionDigits: d, maximumFractionDigits: d });
+const pct = (x, d = 1) => fmt(x * 100, d) + ' %';
+
+const FIELDS = {
+  primary: [['n_loco', 'Электровозов в работе'], ['n_wagons', 'Вагонов в составе'], ['n_posts', 'Постов погрузки'], ['n_loader', 'ПДМ на погрузке'],
+    ['plan_shift', 'План руды в смену, т'], ['v_kmh', 'Паспортная скорость, км/ч'], ['L_path', 'Длина пути, м']],
+  secondary: [['k_v', 'Доля паспортной скорости'], ['t_pdm', 'Цикл ПДМ на вагон, с'], ['t_podacha', 'Подача вагона, с'], ['t_post', 'Постановка под погрузку, с'],
+    ['t_unload', 'Разгрузка на КДРВ, с'], ['ktg', 'КТГ электровозов'], ['m_wag', 'Груз в вагоне, т'], ['a', 'Ускорение, м/с²'], ['b', 'Замедление, м/с²'],
+    ['L_razm', 'Длина разминовки, м'], ['n_blocks', 'Блок-участков']],
+};
+const SRC = { n_loco: 'd', n_wagons: 'd', n_posts: 'd', n_loader: 'd', plan_shift: 'd', v_kmh: 'd', ktg: 'd', t_unload: 'd', m_wag: 'p', t_pdm: 'p', t_podacha: 'p', t_post: 'p',
+  a: 'p', L_path: 'a', k_v: 'a', b: 'a', L_razm: 'a', n_blocks: 'a' };
+const SRCN = { d: 'шахта', p: 'норматив', a: 'допущение' };
+const FIELD_KEYS = FIELDS.primary.concat(FIELDS.secondary).map(x => x[0]);
+
+function buildInputs() {
+  const mk = ([k, label]) => {
+    const m = M[k];
+    return `<div class="f"><label for="p_${k}">${esc(label)}</label><input id="p_${k}" data-k="${k}" type="text" inputmode="decimal" value="${m.value}" autocomplete="off">` +
+      `<div class="meta"><span class="tag ${SRC[k]}">${SRCN[SRC[k]]}</span><span id="e_${k}" class="errt"></span><span title="${esc(m.note || '')}">${esc(k === 'L_path' ? 'условная: пикетажа нет (A10)' : (m.note || '').slice(0, 54) + ((m.note || '').length > 54 ? '…' : ''))}</span></div></div>`;
+  };
+  $('#primary').innerHTML = FIELDS.primary.map(mk).join('');
+  $('#secondary').innerHTML = FIELDS.secondary.map(mk).join('');
+}
+
+let P = Object.assign({}, D), kind = 'shift', base = null, lastOk = null, timer = 0;
+
+function readInputs() {
+  const vals = {}, errs = {};
+  FIELD_KEYS.forEach(k => {
+    const el = $('#p_' + k), s = el.value.trim().replace(',', '.'), m = M[k];
+    const v = Number(s);
+    let e = '';
+    if (s === '' || !isFinite(v)) e = 'не число';
+    else if (v < m.min || v > m.max) e = `от ${m.min} до ${m.max}`;
+    else if (m.int && Math.abs(v - Math.round(v)) > 1e-9) e = 'целое';
+    $('#e_' + k).textContent = e; el.classList.toggle('err', !!e);
+    el.classList.toggle('chg', !e && Math.abs(v - D[k]) > 1e-12);
+    if (e) errs[k] = e; else vals[k] = m.int ? Math.round(v) : v;
+  });
+  return { vals, errs };
+}
+
+function sim(over, kd) {
+  const Q = Object.assign({}, P, over || {});
+  const clean = {};
+  for (const k of Object.keys(over || {})) { const m = M[k]; if (!m || Q[k] < m.min || Q[k] > m.max) return null; if (m.int) Q[k] = Math.round(Q[k]); }
+  try { return ENG.simulate(Q, kd || kind); } catch (e) { return null; }
+}
+
+function compute() {
+  const { vals, errs } = readInputs();
+  const bad = Object.keys(errs).length;
+  if (bad) {
+    const w = document.getElementById('errBox'); if (!w) $('#verdict').insertAdjacentHTML('afterbegin', '<div class="warnbox" id="errBox">Исправьте выделенные поля: расчёт показан по последним верным значениям.</div>');
+    if (lastOk) return;
+  } else { const w = document.getElementById('errBox'); if (w) w.remove(); }
+  P = Object.assign({}, D, vals, bad && lastOk ? lastOk.vals : {});
+  kind = $('#kind').value;
+  const R = ENG.simulate(P, kind), S = ENG.scheme(P);
+  lastOk = { vals: Object.assign({}, vals) };
+  const ctx = { R, S };
+  ctx.what = whatIf(R);
+  ctx.sens = sensitivity(R);
+  render(ctx);
+}
+
+/* ---------- сценарии «что если» ---------- */
+function whatIf(R) {
+  const t0 = R.kpi.tonnes;
+  const list = [
+    ['+1 электровоз', { n_loco: P.n_loco + 1 }], ['+1 ПДМ на погрузке', { n_loader: P.n_loader + 1 }], ['+1 пост погрузки', { n_posts: P.n_posts + 1 }],
+    ['Цикл ПДМ на вагон −10 %', { t_pdm: P.t_pdm * 0.9 }], ['Подача вагона −20 %', { t_podacha: P.t_podacha * 0.8 }],
+    ['Постановка под погрузку −20 %', { t_post: P.t_post * 0.8 }], ['Скорость хода +10 %', { k_v: Math.min(1, P.k_v * 1.1) }],
+    ['+1 вагон в составе', { n_wagons: P.n_wagons + 1 }], ['Разгрузка на КДРВ −20 %', { t_unload: P.t_unload * 0.8 }],
+  ];
+  const out = [];
+  list.forEach(([name, ov]) => {
+    const r = sim(ov); if (!r) { out.push({ name, na: true }); return; }
+    out.push({ name, t: r.kpi.tonnes, d: r.kpi.tonnes - t0, pp: r.kpi.plan_pct, util: r.kpi.util_mean });
+  });
+  out.sort((a, b) => (b.na ? -1e9 : b.d) - (a.na ? -1e9 : a.d));
+  return out;
+}
+
+/* ---------- чувствительность к допущениям: ±20 % ---------- */
+function sensitivity(R) {
+  const t0 = R.kpi.tonnes, rows = [];
+  [['k_v', 'Доля паспортной скорости'], ['t_pdm', 'Цикл ПДМ на вагон'], ['t_podacha', 'Подача вагона'], ['t_post', 'Постановка под погрузку'], ['t_unload', 'Разгрузка на КДРВ'],
+   ['L_path', 'Длина пути'], ['ktg', 'КТГ электровозов'], ['b', 'Замедление'], ['a', 'Ускорение'], ['L_razm', 'Длина разминовки'], ['n_blocks', 'Число блок-участков']].forEach(([k, name]) => {
+    const f = x => { const v = P[k] * x; const m = M[k]; const vv = m.int ? Math.round(v) : v; const r = sim({ [k]: Math.min(m.max, Math.max(m.min, vv)) }); return r ? r.kpi.tonnes - t0 : null; };
+    const lo = f(0.8), hi = f(1.2);
+    rows.push({ k, name, val: P[k], unit: '', src: SRC[k], lo, hi, mag: Math.max(Math.abs(lo || 0), Math.abs(hi || 0)) });
+  });
+  rows.sort((a, b) => b.mag - a.mag);
+  return rows;
+}
+
+/* ---------- отрисовка ---------- */
+function linkUtil(key, R) {
+  const r = R.resources;
+  if (key === 'locos') return R.kpi.util_mean;
+  if (key === 'posts') return r.posts.reduce((s, x) => s + x, 0) / r.posts.length;
+  if (key === 'loader') return r.loader;
+  if (key === 'kdrv') return r.kdrv;
+  return Math.max.apply(null, r.blocks);
+}
+const SHORT = { locos: 'Электровозы Ferrit', posts: 'Посты погрузки С-14, С-15', loader: 'ПДМ ST1030 №2', kdrv: 'КДРВ №2', track: 'Блок-участки пути' };
+
+function render(c) {
+  const { R, S } = c, k = R.kpi, d = R.derived, cap = S.capacity;
+  const pc = k.plan_pct, cls = pc >= 1 ? 'ok' : pc >= 0.9 ? 'warn' : 'bad';
+  const unitHours = d.horizon;                         // для подписи
+  const L = cap.links, low = L.find(x => x.key === cap.bottleneck);
+  const need = cap.required_rate;
+  const reserve = need ? low.rate / need - 1 : null;
+  const miss = d.plan_total - k.tonnes;
+  const best = c.what.find(x => !x.na && x.d > 1);
+  const trainMass = P.n_wagons * P.m_wag;
+  let txt = `За ${kind === 'shift' ? 'смену' : 'сутки'} выгружается ${fmt(k.tonnes)} т при плане ${fmt(d.plan_total)} т (${pct(pc)}). `;
+  txt += pc >= 1 ? 'План выполняется. ' : `Не хватает ${fmt(miss)} т (около ${fmt(miss / trainMass, 1)} состава). `;
+  txt += `Цепочку ограничивает ${SHORT[cap.bottleneck]}: ${fmt(low.rate, 2)} состава/ч при потребности ${fmt(need, 2)}`;
+  txt += reserve != null && reserve >= 0 ? ` (запас ${pct(reserve, 0)}).` : ` (нехватка ${pct(-reserve, 0)}).`;
+  if (best) txt += ` Самый сильный шаг: «${best.name}», +${fmt(best.d)} т (${pct(best.pp)} плана).`;
+  else if (pc < 1) txt += ' Ни одно из проверенных изменений не закрывает план, нужны другие меры.';
+  const bd = base ? k.tonnes - base.tonnes : null;
+  const dl = (x, unit) => x == null ? '' : `<div class="delta ${x > 0.5 ? 'up' : x < -0.5 ? 'dn' : ''}">к базе ${x > 0 ? '+' : ''}${fmt(x, unit === '%' ? 1 : 0)} ${unit}</div>`;
+  const dlt = base ? dl(bd, 'т') : '';
+  const ok = Math.abs(R.checks.balance_diff) < 1e-6 && !R.checks.deadlock;
+  $('#verdict').innerHTML = (document.getElementById('errBox') ? '<div class="warnbox" id="errBox">Исправьте выделенные поля: расчёт показан по последним верным значениям.</div>' : '') +
+    `<div class="vhead"><span class="pill ${cls}">${pc >= 1 ? 'План выполняется' : pc >= 0.9 ? 'План под угрозой' : 'План не выполняется'}</span>` +
+    `<span class="note">имитация движения составов, ${kind === 'shift' ? 'одна смена' : 'сутки'}; проверки модели ${ok ? 'пройдены (баланс массы, блокировок нет)' : '<b>не пройдены</b>'}</span></div>` +
+    `<p class="vtext">${esc(txt)}</p>` +
+    `<div class="tiles">` +
+    `<div class="tile ${cls}"><div class="v">${fmt(k.tonnes)} т</div><div class="l">выгружено на КДРВ №2</div>${dlt}</div>` +
+    `<div class="tile ${cls}"><div class="v">${pct(pc)}</div><div class="l">план ${fmt(d.plan_total)} т</div>${base ? dl((pc - base.plan_pct) * 100, '%') : ''}</div>` +
+    `<div class="tile"><div class="v">${fmt(k.trains)}</div><div class="l">составов, нужно ${fmt(k.trains_needed, 1)}</div></div>` +
+    `<div class="tile"><div class="v">${fmt(k.q_window, 0)} т/ч</div><div class="l">в окне работы</div></div>` +
+    `<div class="tile"><div class="v">${pct(k.util_mean, 0)}</div><div class="l">загрузка электровозов</div></div></div>` +
+    `<p class="note" style="margin:0">Оценка без очередей (верхняя граница): ${fmt(cap.tonnes_ref * (kind === 'shift' ? 1 : 2))} т. Разница с имитацией ${fmt(cap.tonnes_ref * (kind === 'shift' ? 1 : 2) - k.tonnes)} т — потери на ожидания.</p>`;
+  renderBottleneck(c);
+  renderWhat(c);
+  renderAssume(c);
+  renderRoute(c);
+  $('#report').value = reportText(c, txt);
+  renderAbout();
+}
+
+function renderBottleneck(c) {
+  const { R, S } = c, L = S.capacity.links, need = S.capacity.required_rate;
+  const scale = Math.max(need * 2.2, 1);
+  let h = '<div class="bars">';
+  L.forEach(x => {
+    const hot = x.key === S.capacity.bottleneck, u = linkUtil(x.key, R);
+    h += `<div class="bar${hot ? ' hot' : ''}"><div class="nm">${esc(SHORT[x.key])}${hot ? ' · узкое место' : ''}<div class="note">${esc(x.formula)}</div></div>` +
+      `<div class="track" role="img" aria-label="${esc(SHORT[x.key])}: ${fmt(x.rate, 2)} состава в час"><div class="fill" style="width:${Math.min(100, x.rate / scale * 100)}%"></div><div class="need" style="left:${Math.min(100, need / scale * 100)}%" title="потребность"></div></div>` +
+      `<div class="val">${fmt(x.rate, 2)} сост./ч<div class="note">занят ${pct(u, 0)}</div></div></div>`;
+  });
+  h += `</div><p class="legend">Чёрная метка: потребность для плана, ${fmt(need, 2)} состава/ч. Шкала обрезана, КДРВ №2 пропускает ${fmt(L.find(x => x.key === 'kdrv').rate, 0)} сост./ч. «Занят» — доля времени ресурса по имитации.</p>`;
+  // состав цикла
+  const t = S.times, la = S.kinematics;
+  const run = t.t_run_one_way, load = t.t_load_train, un = t.t_unload;
+  const cyc = R.kpi.cycle_mean, an = t.cycle_analytic, wait = cyc != null ? Math.max(0, cyc - an) : 0;
+  const seg = [['Погрузка', load, 'var(--accent)'], ['Груженый ход', run, '#4f8fb3'], ['Разгрузка', un, '#8aa7b8'], ['Порожний ход', run, '#6aa6c6'], ['Ожидания в имитации', wait, 'var(--bad)']];
+  const tot = seg.reduce((s, x) => s + x[1], 0);
+  h += `<h3>Из чего состоит цикл электровоза</h3><div class="cyc" role="img" aria-label="Состав цикла">${seg.map(x => `<span style="width:${x[1] / tot * 100}%;background:${x[2]}" title="${x[0]}: ${fmt(x[1] / 60, 1)} мин"></span>`).join('')}</div>` +
+    `<div class="cl">${seg.map(x => `<span><i style="background:${x[2]}"></i>${x[0]} ${fmt(x[1] / 60, 1)} мин</span>`).join('')}</div>`;
+  const wt = R.waits.slice().sort((a, b) => b.total - a.total).filter(w => w.total > 0);
+  const sumW = P.n_loco * R.derived.t_eff_sum;
+  h += `<p class="note">Цикл по формуле: ${fmt(an / 60, 1)} мин. В имитации средний цикл ${cyc != null ? fmt(cyc / 60, 1) : '—'} мин. ` +
+    (wt.length ? 'Главные ожидания: ' + wt.slice(0, 3).map(w => `${esc(w.state)} ${pct(w.total / sumW, 0)} времени электровозов`).join(', ') + '.' : 'Ожиданий нет.') + '</p>';
+  $('#bottleneck').innerHTML = h;
+}
+
+function renderWhat(c) {
+  const t0 = c.R.kpi.tonnes, plan = c.R.derived.plan_total;
+  let h = '<div class="scroll"><table><thead><tr><th>Изменение</th><th>Выгрузка, т</th><th>Δ, т</th><th>План</th><th class="l">Эффект</th></tr></thead><tbody>';
+  const mx = Math.max.apply(null, c.what.filter(x => !x.na).map(x => Math.abs(x.d)).concat([1]));
+  const bestName = (c.what.find(x => !x.na && x.d > 1) || {}).name;
+  c.what.forEach(w => {
+    if (w.na) { h += `<tr><td class="l">${esc(w.name)}</td><td colspan="4" class="l note">вне допустимых границ параметра</td></tr>`; return; }
+    const w2 = Math.min(100, Math.abs(w.d) / mx * 100);
+    h += `<tr class="${w.name === bestName ? 'best' : ''}"><td class="l">${esc(w.name)}</td><td class="num">${fmt(w.t)}</td><td class="num">${w.d >= 0 ? '+' : ''}${fmt(w.d)}</td><td class="num">${pct(w.pp)}</td>` +
+      `<td class="l"><div class="mini"><b style="left:0;width:${w2}%;background:${w.d > 1 ? 'var(--ok)' : w.d < -1 ? 'var(--bad)' : 'var(--line)'}"></b></div>${Math.abs(w.d) < 1 ? '<span class="note">не влияет: ограничивает другое звено</span>' : ''}</td></tr>`;
+  });
+  h += `</tbody></table></div><p class="note">Каждая строка — отдельный пересчёт имитации с одним изменённым параметром относительно текущих значений (${fmt(t0)} т, ${pct(t0 / plan)} плана). Строка «не влияет» показывает, что пока не снято текущее узкое место, это изменение не помогает.</p>`;
+  $('#whatif').innerHTML = h;
+}
+
+function renderAssume(c) {
+  const mx = Math.max.apply(null, c.sens.map(x => x.mag).concat([1]));
+  let h = '<p class="note" style="margin-top:0">Что будет с выгрузкой, если допущение окажется на 20 % меньше или больше. Сверху допущения с наибольшим влиянием: их нужно подтвердить в первую очередь.</p>' +
+    '<div class="scroll"><table><thead><tr><th>Параметр</th><th>Значение</th><th>Источник</th><th>−20 %</th><th>+20 %</th><th class="l">Влияние</th></tr></thead><tbody>';
+  c.sens.forEach(x => {
+    const w = x.mag / mx * 100;
+    h += `<tr><td class="l">${esc(x.name)}</td><td class="num">${fmt(x.val, x.val < 5 ? 3 : 1)}</td><td><span class="tag ${x.src}">${SRCN[x.src]}</span></td>` +
+      `<td class="num">${x.lo == null ? '—' : (x.lo >= 0 ? '+' : '') + fmt(x.lo) + ' т'}</td><td class="num">${x.hi == null ? '—' : (x.hi >= 0 ? '+' : '') + fmt(x.hi) + ' т'}</td>` +
+      `<td class="l"><div class="mini"><b style="left:0;width:${w}%;background:${x.mag < 1 ? 'var(--line)' : x.src === 'a' ? 'var(--warn)' : 'var(--accent)'}"></b></div></td></tr>`;
+  });
+  h += '</tbody></table></div><h3>Допущения модели, которые не задаются числом</h3><ul class="plain">' +
+    '<li><b>Порожний состав возвращается по той же трассе в обратном порядке.</b> Рельсового графа гор. −480 нет, отдельные порожняковые ветви не подключены (вопросы A10, G1).</li>' +
+    '<li><b>Длина пути 2400 м условная.</b> Плечи между узлами пропорциональны хордам по плану (вопрос A10), фактический пикетаж нужен от маркшейдера.</li>' +
+    '<li><b>Скорость одинакова на всём пути</b> и для груженого, и для порожнего; уклон и масса состава на неё не влияют (вопрос C).</li>' +
+    '<li><b>Погрузку выполняет одна ПДМ ST1030 №2</b> на оба поста, время вагона из хронометража 1,47 мин при плече 15 м; плечо 60 м не учтено.</li>' +
+    '<li><b>Руда из карманов не ограничена:</b> подвоз с С-1 и объёмы карманов не моделируются (вопрос A3).</li>' +
+    '<li><b>Породные составы проходки</b> в этом расчёте не учитываются, рудные составы идут одни.</li></ul>';
+  $('#assume').innerHTML = h;
+}
+
+const ROUTE = [
+  ['Карман С-14 (порода), пост погрузки', 9385.2, 33757.3], ['Камера разъезда (перегрузки)', 9354.6, 33787.6], ['Откаточный штрек западный', 9168.0, 33782.5],
+  ['Заезд 9/52', 8857.3, 33859.0], ['Грузовой квершлаг 1', 8691.5, 33784.9], ['Съезд на обгонную выработку', 8295.0, 33554.4],
+  ['Грузовая ветвь опрокида №2', 8271.9, 33499.8], ['Заезд на ил-ник и во-к', 8233.2, 33446.3], ['Заезд на камеру опрокидывателя №2 (КДРВ №2)', 8156.3, 33295.1],
+];
+function renderRoute(c) {
+  const v = P.v_kmh * P.k_v / 3.6, ta = v / (2 * P.a), tb = v / (2 * P.b);
+  const chord = []; let sum = 0;
+  for (let i = 1; i < ROUTE.length; i++) { const l = Math.hypot(ROUTE[i][1] - ROUTE[i - 1][1], ROUTE[i][2] - ROUTE[i - 1][2]); chord.push(l); sum += l; }
+  const kk = P.L_path / sum, legs = chord.map(l => l * kk), nb = Math.trunc(P.n_blocks), Lb = P.L_path / nb;
+  const cum = [0]; legs.forEach((l, i) => cum.push(cum[i] + l));
+  const row = (n, name, leg, pos, tm, blk) => `<tr><td>${n}</td><td class="l">${esc(name)}</td><td class="num">${leg == null ? '—' : fmt(leg, 0)}</td><td class="num">${fmt(pos, 0)}</td><td class="num">${blk}</td><td class="num">${fmt(tm, 0)}</td></tr>`;
+  const head = '<thead><tr><th>№</th><th class="l">Узел по чертежу</th><th>Плечо, м</th><th>Пройдено, м</th><th>Блок</th><th>Время, с</th></tr></thead>';
+  const blk = x => Math.min(nb, Math.floor(x / Lb) + 1);
+  let g = '<tr><td colspan="6" class="l"><b>Груженый: С-14 → КДРВ №2</b> (разгон ' + fmt(ta, 1) + ' с в начале, торможение ' + fmt(tb, 1) + ' с в конце)</td></tr>';
+  g += row(0, ROUTE[0][0], null, 0, ta, 1);
+  for (let i = 1; i < ROUTE.length; i++) g += row(i, ROUTE[i][0], legs[i - 1], cum[i], ta + cum[i] / v + (i === ROUTE.length - 1 ? tb : 0), blk(Math.min(cum[i], P.L_path - 1e-6)));
+  const n = ROUTE.length; let e = '<tr><td colspan="6" class="l"><b>Порожний: КДРВ №2 → С-14</b> (тот же путь в обратном порядке)</td></tr>';
+  e += row(0, ROUTE[n - 1][0], null, 0, ta, nb);
+  for (let j = 1; j < n; j++) { const i = n - 1 - j, pos = P.L_path - cum[i]; e += row(j, ROUTE[i][0], legs[i], pos, ta + pos / v + (j === n - 1 ? tb : 0), blk(Math.min(cum[i], P.L_path - 1e-6))); }
+  // схема
+  const xs = ROUTE.map(r => r[1]), ys = ROUTE.map(r => r[2]), x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs), y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
+  const W = 720, H = 300, pad = 30, sc = Math.min((W - 2 * pad) / (x1 - x0), (H - 2 * pad) / (y1 - y0));
+  const px = x => pad + (x - x0) * sc, py = y => H - pad - (y - y0) * sc;
+  const pts = ROUTE.map(r => px(r[1]).toFixed(1) + ',' + py(r[2]).toFixed(1)).join(' ');
+  let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Схема трассы электровозов"><polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linejoin="round"/>`;
+  ROUTE.forEach((r, i) => { const cx = px(r[1]), cy = py(r[2]); const end = i === 0 || i === ROUTE.length - 1;
+    svg += `<circle cx="${cx}" cy="${cy}" r="${end ? 9 : 7}" fill="${i === 0 ? 'var(--ok)' : i === ROUTE.length - 1 ? 'var(--bad)' : 'var(--panel)'}" stroke="var(--accent)" stroke-width="2"/><text x="${cx}" y="${cy + 3.5}" text-anchor="middle" style="${end ? 'fill:#fff;' : ''}font-weight:600">${i}</text>`; });
+  svg += `<text x="${W - 8}" y="${H - 8}" text-anchor="end" style="fill:var(--muted)">схема по меткам плана, прямые между узлами; север вверху</text></svg>`;
+  $('#route').innerHTML = svg + `<p class="note">Пост погрузки (0, зелёный) → разгрузка (8, красный). Длина пути ${fmt(P.L_path, 0)} м = сумма хорд ${fmt(sum, 0)} м × k ${fmt(kk, 3)}. Блок-участок ${fmt(Lb, 0)} м, скорость ${fmt(v * 3.6, 1)} км/ч.</p>` +
+    `<details class="box"><summary>Пошаговый расчёт хода: груженый и порожний</summary><div class="scroll"><table>${head}<tbody>${g}${e}</tbody></table></div>` +
+    `<p class="note">Время узла = t<sub>a</sub> + пройдено / v, где t<sub>a</sub> = v / (2a); в конце добавляется t<sub>b</sub> = v / (2b). Ход в одну сторону ${fmt(P.L_path / v + ta + tb, 1)} с.</p></details>`;
+}
+
+function reportText(c, txt) {
+  const { R, S } = c, k = R.kpi, d = R.derived, cap = S.capacity, t = S.times;
+  const L = [];
+  L.push('ГОР. −480: РАСЧЁТ ЛОГИСТИЧЕСКОЙ ЦЕПОЧКИ (электровозы Ferrit, С-14 и С-15 → КДРВ №2)');
+  L.push(`Горизонт расчёта: ${kind === 'shift' ? 'смена 10,2 ч' : 'сутки, 2 смены'}`);
+  L.push('');
+  L.push('ИТОГ'); L.push(txt);
+  L.push(`Составов ${fmt(k.trains)} (нужно ${fmt(k.trains_needed, 1)}), производительность в окне ${fmt(k.q_window, 0)} т/ч, загрузка электровозов ${pct(k.util_mean, 0)}.`);
+  L.push(`Цикл электровоза по формуле ${fmt(t.cycle_analytic / 60, 1)} мин, в имитации ${k.cycle_mean != null ? fmt(k.cycle_mean / 60, 1) : '—'} мин.`);
+  L.push('');
+  L.push('ПРОПУСКНАЯ СПОСОБНОСТЬ ЗВЕНЬЕВ (состав/ч, потребность ' + fmt(cap.required_rate, 2) + ')');
+  cap.links.forEach(x => L.push(`  ${SHORT[x.key]}: ${fmt(x.rate, 2)}${x.key === cap.bottleneck ? '  <- узкое место' : ''}; занят ${pct(linkUtil(x.key, R), 0)}`));
+  L.push('');
+  L.push('ЧТО ДАСТ ИЗМЕНЕНИЕ (выгрузка за ' + (kind === 'shift' ? 'смену' : 'сутки') + ')');
+  c.what.forEach(w => L.push(`  ${w.name}: ${w.na ? 'вне границ' : fmt(w.t) + ' т (' + (w.d >= 0 ? '+' : '') + fmt(w.d) + ' т)'}`));
+  L.push('');
+  L.push('ПАРАМЕТРЫ');
+  FIELD_KEYS.forEach(kk => L.push(`  ${M[kk].label}: ${fmt(P[kk], P[kk] < 5 && !M[kk].int ? 3 : 1)} ${M[kk].unit || ''}${Math.abs(P[kk] - D[kk]) > 1e-12 ? '  (изменено, было ' + D[kk] + ')' : ''}  [${SRCN[SRC[kk]]}]`));
+  L.push('');
+  L.push('ДОПУЩЕНИЯ С НАИБОЛЬШИМ ВЛИЯНИЕМ (±20 %)');
+  c.sens.slice(0, 5).forEach(x => L.push(`  ${x.name}: ${x.lo == null ? '—' : fmt(x.lo)} / ${x.hi == null ? '—' : '+' + fmt(x.hi)} т`));
+  L.push('  Порожний состав идёт по тому же пути, что и груженый; длина пути условная (A10, G1); скорость постоянна на всём пути; руда в карманах не ограничена.');
+  return L.join('\n');
+}
+
+function renderAbout() {
+  $('#about').innerHTML = '<div class="scroll"><table><thead><tr><th class="l">Что нужно пользователю</th><th class="l">Прежняя версия</th><th class="l">Эта версия</th></tr></thead><tbody>' +
+    '<tr><td class="l">Первый результат по гор. −480</td><td class="l">Открыть «Электровозы», нажать «Рассчитать»: 2 действия, перед этим на странице идут справочные карточки</td><td class="l">0 действий: расчёт выполнен при открытии</td></tr>' +
+    '<tr><td class="l">Где видно узкое место</td><td class="l">«Схема» (оценка по формулам) и «Показатели» (ожидания): ещё 2 страницы</td><td class="l">Рядом с итогом, формульная оценка и загрузка по имитации вместе</td></tr>' +
+    '<tr><td class="l">Сценарий «что если»</td><td class="l">Справочник → найти параметр среди 200 → правка → сохранить → «Электровозы» → «Рассчитать» → «Схема»: около 8 действий</td><td class="l">1 действие: правка поля, пересчёт мгновенный; готовые сценарии посчитаны сразу</td></tr>' +
+    '<tr><td class="l">Допущения</td><td class="l">Разбросаны по справочнику, справке и списку вопросов</td><td class="l">Рядом с итогом, с влиянием ±20 % на выгрузку и метками источника</td></tr>' +
+    '<tr><td class="l">Результат для передачи</td><td class="l">Нет единого отчёта, данные на 4 страницах</td><td class="l">Один текстовый отчёт кнопкой</td></tr>' +
+    '<tr><td class="l">Экранов на задачу</td><td class="l">4–5</td><td class="l">1</td></tr></tbody></table></div>' +
+    '<p class="note">Число действий оценено по структуре экранов прежней версии, замеров по секундомеру не было. Расчётное ядро то же: имитация движения составов и аналитическая схема версии 0.11.1, значения по умолчанию совпадают. Прежняя версия не менялась.</p>' +
+    '<details class="box"><summary>Чего в этой версии нет по сравнению с прежней</summary><ul class="plain"><li>Блоки −402 и АТУ, ПДМ и самосвалы, проходка, скреперная добыча, добыча подэтажным обрушением.</li><li>Анимация, графики и редактирование узлов трассы.</li><li>Суточное планирование и роли администратора.</li><li>Хранение данных на устройстве и офлайн-режим: значения живут только до закрытия страницы.</li></ul><p class="note">Если вариант подходит, эти разделы остаются в основной версии, а быстрый расчёт добавляется отдельной главной страницей.</p></details>';
+}
+
+/* ---------- события ---------- */
+function schedule() { clearTimeout(timer); timer = setTimeout(() => { compute(); }, 120); }
+function init() {
+  buildInputs();
+  document.addEventListener('input', e => { if (e.target.matches('#primary input, #secondary input')) schedule(); });
+  $('#kind').addEventListener('change', compute);
+  $('#btnReset').onclick = () => { FIELD_KEYS.forEach(k => { $('#p_' + k).value = D[k]; }); lastOk = null; compute(); };
+  $('#btnBase').onclick = () => { base = ENG.simulate(P, kind).kpi; $('#baseNote').textContent = `База зафиксирована: ${fmt(base.tonnes)} т, ${pct(base.plan_pct)} плана. Дальше показана разница.`; compute(); };
+  $('#btnCopy').onclick = async () => {
+    const ta = $('#report'); ta.focus(); ta.select();
+    try { await navigator.clipboard.writeText(ta.value); $('#copyMsg').textContent = 'Скопировано'; } catch (e) { $('#copyMsg').textContent = 'Текст выделен, скопируйте клавишами Ctrl+C'; }
+  };
+  compute();
+}
+init();
+</script>
+</body>
+</html>

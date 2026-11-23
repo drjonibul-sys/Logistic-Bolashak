@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Скреперная добыча −480 · Логистика гор. −480</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%231f6fb5'/%3E%3Cpath d='M3 11h10M5 11V6h6v5' stroke='white' fill='none' stroke-width='1.5'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="scraper">
+<main id="page">
+<h1>Скреперная добыча на гор. −480</h1>
+<p class="lead">Руда доставляется скреперами и грузится в вагоны с откаточных ортов №28, №27 и №26. С этих выработок отгружается недостающее до плана смены количество руды: из плана вычитается руда гор. −402 (через АТУ, С-1 и С-16). Трассы ортов взяты из плана гор. −480. Режимы: автоматический (недостающая руда делится между ортами по ёмкости скреперов) и ручной (тонны за смену по ортам вводит пользователь).</p>
+<section class="card">
+  <div class="row">
+    <label>Режим
+      <select id="scMode"><option value="auto">Автоматический</option><option value="manual">Ручной</option></select>
+    </label>
+    <button class="btn" id="scReset" type="button">Сбросить поправки</button>
+    <span class="msg" id="scMsg" role="status"></span>
+  </div>
+  <p class="hint">Число установок, длина скреперования и тонны за смену (в ручном режиме) можно ввести в таблице ниже: пустое поле берёт автоматическое значение из справочника. Поправки хранятся в этом браузере.</p>
+</section>
+<div id="scOut"></div>
+</main>
+<script src="js/blocks.js"></script>
+<script src="js/scraper.js"></script>
+<script src="js/common.js"></script>
+<script src="js/p-scraper.js"></script>
+</body>
+</html>

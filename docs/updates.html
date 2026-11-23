@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Обновления · Логистика гор. −480</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%231f6fb5'/%3E%3Cpath d='M3 11h10M5 11V6h6v5' stroke='white' fill='none' stroke-width='1.5'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1f6fb5">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Логистика">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+</head>
+<body data-page="updates">
+<main id="page">
+<h1>Обновления</h1>
+<div class="tabs" role="tablist">
+  <a class="tab on" href="updates.html" aria-current="page">Проверка</a>
+  <a class="tab" href="update-source.html">Источник</a>
+</div>
+<p class="lead">Приложение сравнивает свою версию с файлом version.json на сайте-источнике и сообщает, есть ли новая.</p>
+
+<section class="card">
+  <h3>Состояние</h3>
+  <div class="scroll"><table id="tblUpd"></table></div>
+  <p class="row"><button class="btn primary" id="btnCheck" type="button">Проверить обновление</button>
+  <a class="btn" href="settings.html">Настройки</a></p>
+  <p class="msg" id="updMsg" role="status"></p>
+</section>
+
+<section class="card" id="cardNotes" hidden>
+  <h3>Что нового в версии на источнике</h3>
+  <ul class="plain" id="notesList"></ul>
+</section>
+
+<section class="card">
+  <h3>Как обновляется приложение</h3>
+  <ol class="plain">
+    <li>Вы выкладываете новую сборку на хостинг поверх старой (файл version.json внутри неё содержит номер).</li>
+    <li>Здесь нажимаете «Проверить обновление». Если версия на сайте выше, появится окно с кнопкой «Установить обновление».</li>
+    <li>Страницы заменяются на новые, данные на устройстве остаются. Если источник на другом адресе, данные браузер не переносит, поэтому сначала сделайте копию в «Настройках».</li>
+  </ol>
+</section>
+
+</main>
+<script src="js/blocks.js"></script>
+<script src="js/params-data.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/local-api.js"></script>
+<script src="js/pwa.js"></script>
+<script src="js/updater.js"></script>
+<script src="js/common.js"></script>
+<script src="js/p-updates.js"></script>
+</body>
+</html>

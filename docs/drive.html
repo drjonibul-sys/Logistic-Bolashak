@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Проходка · Логистика гор. −480</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%231f6fb5'/%3E%3Cpath d='M3 11h10M5 11V6h6v5' stroke='white' fill='none' stroke-width='1.5'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1f6fb5">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Логистика">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+</head>
+<body data-page="drive">
+<main id="page">
+<h1>Горнопроходческие работы: циклограмма забоя</h1>
+<p class="lead">Циклограмма построена на основе фактических работ (класс проходки 5, «Накл. съезд»): две смены по 12 ч, спуск и вывоз смены, окна взрывных работ в конце смен, откатка и отгрузка горной массы, торкрет-бетон в два слоя, арочные рамы PANTEX, анкеры, бурение и заряжание забоя. Основные параметры (сечение, длина заходки, вид крепления) подставляются автоматически из класса и <a href="reference.html">справочника</a> и корректируются вручную. Режимы: автоматический (количества по паспорту, операции раскладываются по сменам) и ручной (количества и минуты по сменам, как в файле).</p>
+<section class="card">
+  <div class="row">
+    <label>Режим
+      <select id="drMode"><option value="auto">Автоматический</option><option value="manual">Ручной</option></select>
+    </label>
+    <label>Горизонт
+      <select id="drHor"><option value="shift">Смена</option><option value="day">Сутки (две смены)</option><option value="month">Месяц (30 суток)</option></select>
+    </label>
+    <span class="msg" id="drMsg" role="status"></span>
+  </div>
+  <p class="hint" id="drHint"></p>
+</section>
+<section class="card" id="drArms">
+  <h3>Горизонт и плечи откатки</h3>
+  <div class="row">
+    <label>Плечи
+      <select id="arMode"><option value="manual">Ввод вручную</option><option value="auto">Расчёт по чертежам проектов</option></select>
+    </label>
+    <label>Наименование горизонта <input type="text" id="arName" maxlength="80" placeholder="например, Гор. −402"></label>
+    <label>Плечо ПДМ, м <input type="number" id="arPdm" min="5" max="500" step="1"></label>
+  </div>
+  <div id="arAuto" hidden>
+    <div class="row">
+      <label>Чертёж <select id="arHid"></select></label>
+      <label>Забой <select id="arFrom"></select></label>
+      <label>Пункт разгрузки <select id="arTo"></select></label>
+      <label id="arC1l" class="inline"><input type="checkbox" id="arC1"> продолжить по АТУ до С-1</label>
+      <label id="arKl">k_изв <input type="number" id="arK" min="1" max="2" step="0.05"></label>
+    </div>
+  </div>
+  <div class="scroll"><table id="arTbl"></table></div>
+  <p class="row"><button class="btn" id="arAdd" type="button">Добавить участок</button><span class="msg" id="arMsg" role="status"></span></p>
+  <p class="hint" id="arHint"></p>
+</section>
+<section class="card" id="drPass">
+  <h3>Паспорт проходки: сечение, заходка, крепление</h3>
+  <div class="row">
+    <label>Класс проходки и вид крепления <select id="psPreset"></select></label>
+    <button class="btn" id="psReset" type="button">Сбросить поправки</button><span class="msg" id="psMsg" role="status"></span>
+  </div>
+  <div class="row" id="psSup" role="group" aria-label="Виды крепления"></div>
+  <p class="hint">Колонка «Авто» показывает значение из выбранного класса или справочника; поле «Принято» с вашей поправкой подсвечено и сильнее авто. Поправки хранятся в этом браузере.</p>
+  <div class="scroll"><table id="psTbl" class="pass"></table></div>
+  <div class="scroll"><table id="psQty" class="pass"></table></div>
+  <p class="hint">В классе 5 толщины слоёв торкрета, шаг анкеров, расход ВВ и ковш подобраны так, чтобы формулы давали количества из циклограммы (65 шпуров, 30 ковшей, 20 вагонов, 1 и 3 миксера, 12 анкеров); это калибровка, уточнить по паспорту крепления и БВР.</p>
+</section>
+<section class="card" id="drManual" hidden>
+  <h3>Ручной ввод: количества и минуты по сменам</h3>
+  <div class="row">
+    <label>Смен в цикле <select id="mShifts"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></label>
+    <button class="btn" id="btnFillAuto" type="button">Заполнить из автоматического расчёта</button>
+    <button class="btn" id="btnFile" type="button">Подставить циклограмму из файла</button><span class="msg" id="mMsg" role="status"></span>
+  </div>
+  <p class="hint">Пустое поле «мин» берёт норму (в подсказке поля). Количество вагонов и ковшей задаёт время откатки и отгрузки; вспомогательные работы в автоматическом режиме — остаток смены.</p>
+  <div class="scroll"><table id="drManTbl"></table></div>
+</section>
+<div id="drOut"></div>
+</main>
+<script src="js/blocks.js"></script>
+<script src="js/drawings.js"></script>
+<script src="js/drive.js"></script>
+<script src="js/params-data.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/local-api.js"></script>
+<script src="js/pwa.js"></script>
+<script src="js/updater.js"></script>
+<script src="js/common.js"></script>
+<script src="js/p-drive.js"></script>
+</body>
+</html>

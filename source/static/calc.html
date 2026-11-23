@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Общий расчёт · Логистика гор. −480</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%231f6fb5'/%3E%3Cpath d='M3 11h10M5 11V6h6v5' stroke='white' fill='none' stroke-width='1.5'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="calc">
+<main id="page">
+<h1>Общий расчёт по блокам транспортировки</h1>
+<p class="lead">Три блока: гор. −480 (электровозы), АТУ (самосвалы) и гор. −402 (ПДМ и самосвалы). Для каждого блока отдельно считается производительность логистики. Здесь же справочник выработок: названия и плечи правит администратор, страницы «ПДМ и самосвалы» и «Электровозы» берут их отсюда. Прочие параметры лежат в <a href="reference.html">справочнике параметров</a>.</p>
+<div id="calcSummary"></div>
+<section class="card" id="flow"></section>
+<div id="calcBlocks"></div>
+<div class="sticky-bar" id="blkBtns" hidden>
+  <button id="btnBlkSave" class="btn primary" type="button">Сохранить выработки и плечи</button>
+  <button id="btnBlkReset" class="btn" type="button">Вернуть значения по умолчанию</button>
+  <span id="blkDirty" class="msg"></span>
+  <span id="blkMsg" class="msg" role="status"></span>
+</div>
+</main>
+<script src="js/blocks.js"></script>
+<script src="js/scraper.js"></script>
+<script src="js/drive.js"></script>
+<script src="js/common.js"></script>
+<script src="js/p-calc.js"></script>
+</body>
+</html>

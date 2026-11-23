@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Настройки · Логистика гор. −480</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%231f6fb5'/%3E%3Cpath d='M3 11h10M5 11V6h6v5' stroke='white' fill='none' stroke-width='1.5'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="settings">
+<main id="page">
+<h1>Настройки</h1>
+<p class="lead">Сведения о версии, выгрузка всего приложения на устройство, копия данных и переход к проверке обновлений.</p>
+
+<section class="card">
+  <h3>Это приложение</h3>
+  <div class="scroll"><table id="tblApp"></table></div>
+  <p class="row"><a class="btn" href="updates.html">Обновления</a><a class="btn" href="update-source.html">Источник обновлений</a></p>
+</section>
+
+<section class="card" id="cardExport">
+  <h3>Выгрузить приложение на устройство</h3>
+  <p>Кнопка собирает один архив ZIP со всеми страницами, скриптами, значками и службой офлайн-работы. Архив можно сохранить в «Файлы», передать на другой телефон или выложить на свой хостинг: после распаковки папка работает так же, как это приложение.</p>
+  <label class="inline"><input type="checkbox" id="expData"> Добавить копию моих данных (справочник, планы, расчёты) в папку data</label>
+  <p class="row"><button class="btn primary" id="btnExport" type="button">Выгрузить приложение (ZIP)</button>
+  <button class="btn" id="btnAgain" type="button" hidden>Скачать ещё раз</button>
+  <button class="btn" id="btnShare" type="button" hidden>Сохранить в «Файлы» или отправить</button></p>
+  <p class="msg" id="expMsg" role="status"></p>
+  <p class="hint">iPhone и iPad: если загрузка не началась сама, нажмите «Сохранить в «Файлы» или отправить» и выберите «Сохранить в Файлы». Для работы по ссылке нужен хостинг: распакованную папку загружают на него целиком.</p>
+</section>
+
+<section class="card" id="devCard" hidden></section>
+
+</main>
+<script src="js/blocks.js"></script>
+<script src="js/zip.js"></script>
+<script src="js/updater.js"></script>
+<script src="js/common.js"></script>
+<script src="js/p-settings.js"></script>
+</body>
+</html>

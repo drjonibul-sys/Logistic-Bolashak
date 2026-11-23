@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Добыча: подэтажное обрушение · Логистика гор. −480</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%231f6fb5'/%3E%3Cpath d='M8 2v12M8 14L3 5M8 14l5-9' stroke='white' fill='none' stroke-width='1.3'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1f6fb5">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Логистика">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+</head>
+<body data-page="mining">
+<main id="page">
+<h1>Добыча: подэтажное принудительное обрушение с торцевым выпуском</h1>
+<p class="lead">Руда отбивается веерами скважин из буро-доставочных штреков (БДШ) и выпускается с торца штрека погрузочно-доставочными машинами. Основные параметры веера подставляются автоматически по справочнику (паспорт бурения и взрывания вееров) и могут быть исправлены вручную. Линия наименьшего сопротивления (ЛНС) считается тремя способами; принимается среднее или значение пользователя. После этого выполняется проверка выбранной ЛНС по параметрам массива, рискованные значения подсвечиваются.</p>
+<section class="card">
+  <div class="row">
+    <label>ЛНС, м (пусто — авто)<input type="number" id="mnW" min="0.5" max="6" step="0.05"></label>
+    <button class="btn" id="mnReset" type="button">Сбросить поправки</button>
+    <span class="msg" id="mnMsg" role="status"></span>
+  </div>
+  <p class="hint">Поправки основных параметров вводятся в таблице 1: пустое поле берёт значение справочника. Поправки хранятся в этом браузере.</p>
+</section>
+<div id="mnOut"></div>
+</main>
+<script src="js/blocks.js"></script>
+<script src="js/scraper.js"></script>
+<script src="js/mining.js"></script>
+<script src="js/params-data.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/local-api.js"></script>
+<script src="js/pwa.js"></script>
+<script src="js/updater.js"></script>
+<script src="js/common.js"></script>
+<script src="js/p-mining.js"></script>
+</body>
+</html>
