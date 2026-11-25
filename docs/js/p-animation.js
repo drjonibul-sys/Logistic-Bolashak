@@ -15,7 +15,7 @@ function trackAt(tr, t) {
   return { x: s[3] + (s[4] - s[3]) * f, state: s[2], loaded: s[5] === 1, post: s[6] };
 }
 
-function drawPlanView(items, queue0, queueN, L) {
+function drawPlanView(items, queue0, queueN, L, np) {
   const view = $('#anView').value, cp = $('#cvPlan');
   const on = view !== 'line';
   cp.hidden = !on; $('#cvAnim').hidden = on;
@@ -23,7 +23,7 @@ function drawPlanView(items, queue0, queueN, L) {
   const arr = items.map(it => {
     const atP = Math.abs(it.x) < 1e-6 && !MOVE.includes(it.name), atK = Math.abs(it.x - L) < 1e-6 && !MOVE.includes(it.name);
     let slot = 0;
-    if (atP) slot = it.post >= 0 ? it.post : 2 + queue0.indexOf(it);
+    if (atP) slot = it.post >= 0 ? it.post : np + queue0.indexOf(it);
     else if (atK) slot = it.name === 'разгрузка' ? 0 : -(1 + queueN.indexOf(it));
     return { f: L > 0 ? it.x / L : 0, loaded: it.loaded, id: it.id, wait: it.name.indexOf('ожидание') === 0 || it.name === 'стоянка на разминовке', off: it.name === 'вне работы', slot };
   });
@@ -62,7 +62,7 @@ function drawAnim() {
 
   const queue0 = items.filter(it => Math.abs(it.x) < 1e-6 && !MOVE.includes(it.name) && it.post < 0).sort((a, b) => a.id - b.id);
   const queueN = items.filter(it => Math.abs(it.x - L) < 1e-6 && !MOVE.includes(it.name) && it.name !== 'разгрузка').sort((a, b) => a.id - b.id);
-  drawPlanView(items, queue0, queueN, L);
+  drawPlanView(items, queue0, queueN, L, np);
   const posOf = it => {
     const atPost0 = Math.abs(it.x) < 1e-6 && !MOVE.includes(it.name);
     const atKdrv = Math.abs(it.x - L) < 1e-6 && !MOVE.includes(it.name);
