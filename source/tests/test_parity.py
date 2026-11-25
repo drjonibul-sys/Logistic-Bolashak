@@ -43,6 +43,21 @@ def make_jobs():
         ("heavy-loader", dict(d, t_pdm=300.0, n_loco=12), "shift"),
         ("one-wagon", dict(d, n_wagons=1, n_loco=3), "shift"),
     ]
+    # раздельные гружёный и порожний путь, общий участок — грузовой квершлаг №1 (маршруты от 25.11.2026)
+    lan = dict(d, L_path=3133.0, L_gruz=2076.1, L_por=4190.3, L_obsh=756.2, x_obsh_g=677.5, x_obsh_p=2825.5)
+    for n in (1, 3, 6, 10, 16):
+        jobs.append((f"lanes-loco-{n}", dict(lan, n_loco=n), "shift"))
+    jobs += [
+        ("lanes-day", dict(lan, n_loco=8), "day"),
+        ("lanes-one-block", dict(lan, n_blocks=1, n_loco=6), "shift"),
+        ("lanes-twenty-blocks", dict(lan, n_blocks=20, n_loco=8), "shift"),
+        ("lanes-short-loop", dict(lan, L_razm=60.0, n_loco=8), "shift"),
+        ("lanes-no-loop", dict(lan, L_razm=20.0, n_loco=8), "shift"),
+        ("lanes-shared-whole-lane", dict(lan, L_gruz=2000.0, L_por=2000.0, L_obsh=2000.0, x_obsh_g=0.0, x_obsh_p=0.0, n_loco=8), "shift"),
+        ("lanes-shared-at-start", dict(lan, x_obsh_g=0.0, x_obsh_p=0.0, n_loco=8), "shift"),
+        ("lanes-shared-at-end", dict(lan, x_obsh_g=2076.1 - 756.2, x_obsh_p=4190.3 - 756.2, n_loco=8), "shift"),
+        ("lanes-slow-3posts", dict(lan, k_v=0.4, n_posts=3, n_loader=2, n_loco=10), "shift"),
+    ]
     rnd = random.Random(20261024)
     meta = PR.meta()
     for i in range(40):

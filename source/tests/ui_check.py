@@ -507,7 +507,7 @@ try:
             import json
             pg.click('#btnMoveShow')
             vals = json.loads(pg.input_value('#moveText'))
-            check('перенос: показаны все 203 параметра', vals.get('n_loco') == 7 and len(vals) == 203, len(vals))
+            check('перенос: показаны все 208 параметра', vals.get('n_loco') == 7 and len(vals) == 208, len(vals))
             pg.fill('#moveText', '{oops')
             pg.click('#btnMoveLoad')
             pg.wait_for_function("() => document.querySelector('#moveMsg').textContent.length > 0 && document.querySelector('#moveMsg').classList.contains('err')")

@@ -237,3 +237,39 @@ class TestKnownLimits(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class TestSharedLanes(unittest.TestCase):
+    """Раздельные гружёный и порожний путь, общий участок — грузовой квершлаг №1 (версия 0.14.0)."""
+
+    LAN = dict(PR.defaults(), L_path=3133.0, L_gruz=2076.1, L_por=4190.3, L_obsh=756.2, x_obsh_g=677.5, x_obsh_p=2825.5)
+
+    def test_zero_params_is_legacy(self):
+        d = PR.defaults()
+        a = simulate(dict(d, n_loco=6), "shift")
+        b = simulate(dict(d, n_loco=6, L_gruz=d["L_path"], L_por=d["L_path"], L_obsh=0.0), "shift")
+        self.assertEqual(a["tracks"], b["tracks"])
+
+    def test_one_loco_cycle(self):
+        r = simulate(dict(self.LAN, n_loco=1), "shift")
+        v = r["derived"]["v_ms"]
+        stops = 2 * (r["derived"]["loss_accel"] + r["derived"]["loss_brake"])
+        an = r["derived"]["t_load_train"] + self.LAN["t_unload"] + (2076.1 + 4190.3) / v + stops
+        self.assertAlmostEqual(r["derived"]["cycle_analytic"], an, 6)
+        self.assertAlmostEqual(r["kpi"]["cycle_mean"], an, 6)
+
+    def test_no_deadlock_balance(self):
+        for n in range(1, 21):
+            r = simulate(dict(self.LAN, n_loco=n), "shift")
+            self.assertAlmostEqual(r["checks"]["balance_diff"], 0.0, 6)
+            self.assertFalse(r["checks"]["deadlock"], n)
+
+    def test_loaded_priority(self):
+        r = simulate(dict(self.LAN, n_loco=10), "shift")
+        names = r["state_names"]
+        w = {0: 0.0, 1: 0.0}
+        for tr in r["tracks"]:
+            for s in tr:
+                if names[s[2]] in ("стоянка на разминовке", "ожидание блок-участка", "ожидание в выработке"):
+                    w[s[5]] += s[1] - s[0]
+        self.assertLessEqual(w[0], w[1] + 1e-6)

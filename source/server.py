@@ -99,6 +99,10 @@ def reference_values():
                 vals[k] = v
     # длина пути электровозов задаётся суммой плеч блока −480 в справочнике выработок
     vals["L_path"] = min(max(BL.total_length(blocks_values(), "m480"), 100.0), 10000.0)
+    ln = BL.lanes(blocks_values(), "m480")
+    if ln:
+        vals["L_gruz"], vals["L_por"], vals["L_obsh"] = ln["Lg"], ln["Le"], ln["S"]
+        vals["x_obsh_g"], vals["x_obsh_p"] = ln["xg"], ln["xe"]
     clean, errors = PR.validate(vals)
     return clean if not errors else PR.defaults()
 

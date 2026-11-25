@@ -47,6 +47,41 @@ class _Block:
         self.busy = 0.0
 
 
+def _split(L, xs, S, nb):
+    """Блок-участки одной полосы движения (гружёной или порожней): список длин и признак «общий».
+
+    S <= 0: весь путь общий, nb равных блоков (прежняя модель).
+    S > 0: до общего участка и после него свободные блоки; общий участок — один блок.
+    Свободные блоки делятся между частями пропорционально длине, по одному минимум на непустую часть."""
+    if S <= 0:
+        return [(L / nb, True)] * nb
+    S = min(S, L)
+    xs = min(max(xs, 0.0), L - S)
+    a, b = xs, L - xs - S
+    f = a + b
+    nf = max(nb - 1, 0)
+    na = (max(1, int(math.floor(nf * a / f + 0.5))) if a > 1e-9 else 0) if f > 0 else 0
+    nbb = (max(1, int(math.floor(nf * b / f + 0.5))) if b > 1e-9 else 0) if f > 0 else 0
+    return [(a / na, False) for _ in range(na)] + [(S, True)] + [(b / nbb, False) for _ in range(nbb)]
+
+
+class _Lane:
+    """Полоса движения: блоки (ссылки на объекты, общий блок один на обе полосы), узлы, координаты в масштабе L_path."""
+
+    def __init__(self, L, L_path, parts, shared_block, blocks=None):
+        self.L = L
+        self.len = [x for x, _ in parts]
+        self.blocks = blocks if blocks is not None else [shared_block if sh else _Block() for _, sh in parts]
+        pos = [0.0]
+        for x in self.len:
+            pos.append(pos[-1] + x)
+        scale = L_path / L
+        self.eq = [x * scale for x in pos]
+        self.eq[-1] = L_path
+        self.m = len(self.len)
+        self.parked = [0] * (self.m + 1)
+
+
 class _Loco:
     def __init__(self, i):
         self.id = i
@@ -83,12 +118,27 @@ class Engine:
         self.v = K.speed_ms(P["v_kmh"], P["k_v"])
         self.nb = int(P["n_blocks"])
         self.Lb = P["L_path"] / self.nb
+        Lg = P["L_gruz"] if P.get("L_gruz", 0) > 0 else P["L_path"]
+        Le = P["L_por"] if P.get("L_por", 0) > 0 else P["L_path"]
+        S = P.get("L_obsh", 0.0)
+        S = min(S, Lg, Le) if S > 0 else 0.0
+        pg = _split(Lg, P.get("x_obsh_g", 0.0), S, self.nb)
+        pe = _split(Le, P.get("x_obsh_p", 0.0), S, self.nb)
+        self.shared_mode = S > 0
         self.Lp = K.train_length(P["L_loco"], int(P["n_wagons"]), P["L_wag"])
         self.cap_loop = K.loop_capacity(P["L_razm"], self.Lp, P["L_zap"])
         self.loss_a = K.accel_loss(self.v, P["a"])
         self.loss_b = K.brake_loss(self.v, P["b"])
-        self.blocks = [_Block() for _ in range(self.nb)]
-        self.parked = [0] * (self.nb + 1)
+        if self.shared_mode:
+            sh = _Block()
+            self.lane_g = _Lane(Lg, P["L_path"], pg, sh)
+            self.lane_e = _Lane(Le, P["L_path"], pe, sh)
+            self.blocks = self.lane_g.blocks + [x for x in self.lane_e.blocks if x is not sh]
+        else:
+            self.blocks = [_Block() for _ in range(self.nb)]
+            self.lane_g = _Lane(Lg, P["L_path"], pg, None, self.blocks)
+            self.lane_e = _Lane(Le, P["L_path"], pe, None, self.blocks)
+            self.lane_e.parked = self.lane_g.parked
         n_posts = int(P["n_posts"])
         self.posts = [None] * n_posts
         self.post_start = [0.0] * n_posts
@@ -136,13 +186,20 @@ class Engine:
         self.q_kdrv.append((t, len(self.kdrv_q)))
         self.q_loader.append((t, len(self.loader_q)))
 
+    def lane(self, l):
+        return self.lane_g if l.dir == 1 else self.lane_e
+
+    def pos_x(self, l):
+        """Положение состава в координатах L_path (ось гружёного и порожнего пути приведена к одной шкале)."""
+        return self.lane(l).eq[l.node]
+
     def set_state(self, l, s):
         t = self.t
         if l.state is not None and t > l.state_t:
-            l.states.append((l.state_t, t, l.state, l.x0, l.node * self.Lb, l.loaded, l.post0))
+            l.states.append((l.state_t, t, l.state, l.x0, self.pos_x(l), l.loaded, l.post0))
         l.state = s
         l.state_t = t
-        l.x0 = l.node * self.Lb
+        l.x0 = self.pos_x(l)
         l.post0 = l.post if l.post is not None else -1
 
     # ---------- цикл локомотива ----------
@@ -233,15 +290,16 @@ class Engine:
 
     # ---------- блок-участки ----------
     def request_block(self, l, j, node):
-        B = self.blocks[j]
+        ln = self.lane(l)
+        B = ln.blocks[j]
         if B.holder is None:
             self.grant(l, j)
             return
-        B.waiters.append((l, self.t))
-        if node in (0, self.nb):
+        B.waiters.append((l, self.t, j))
+        if node in (0, ln.m):
             self.set_state(l, "ожидание блок-участка")
-        elif self.parked[node] < self.cap_loop:
-            self.parked[node] += 1
+        elif ln.parked[node] < self.cap_loop:
+            ln.parked[node] += 1
             l.parked_at = node
             l.pending = self.loss_a + self.loss_b
             self.set_state(l, "стоянка на разминовке")
@@ -254,30 +312,32 @@ class Engine:
 
     def grant(self, l, j):
         t = self.t
-        B = self.blocks[j]
+        ln = self.lane(l)
+        B = ln.blocks[j]
         B.holder = l
         B.occ_start = t
         if l.parked_at is not None:
-            self.parked[l.parked_at] -= 1
+            ln.parked[l.parked_at] -= 1
             l.parked_at = None
         pend = l.pending
         l.pending = 0.0
         d = l.dir
         dest = j + 1 if d == 1 else j
-        end_dest = (dest == self.nb) if d == 1 else (dest == 0)
-        t_arr = t + pend + self.Lb / self.v + (self.loss_b if end_dest else 0.0)
+        end_dest = (dest == ln.m) if d == 1 else (dest == 0)
+        t_arr = t + pend + ln.len[j] / self.v + (self.loss_b if end_dest else 0.0)
         if l.holding is not None:
             self.at(t + pend + self.Lp / self.v, self.release_block, l.holding, l)
-        l.holding = j
+        l.holding = B
         self.set_state(l, "ход гружёный" if l.loaded else "ход порожний")
-        l.dest_x = dest * self.Lb
+        l.dest_x = ln.eq[dest]
         l.arr_t = t_arr
         self.at(t_arr, self.arrive, l, dest)
 
     def arrive(self, l, node):
         l.node = node
         d = l.dir
-        if (d == 1 and node == self.nb) or (d == -1 and node == 0):
+        ln = self.lane(l)
+        if (d == 1 and node == ln.m) or (d == -1 and node == 0):
             self.at(self.t + self.Lp / self.v, self.release_block, l.holding, l)
             l.holding = None
             if d == 1:
@@ -288,8 +348,7 @@ class Engine:
             nj = node if d == 1 else node - 1
             self.request_block(l, nj, node)
 
-    def release_block(self, j, l):
-        B = self.blocks[j]
+    def release_block(self, B, l):
         if B.holder is not l:
             return
         B.busy += self.overlap(B.occ_start, self.t)
@@ -297,7 +356,7 @@ class Engine:
         if B.waiters:
             best = min(B.waiters, key=lambda w: (0 if w[0].loaded else 1, w[1], w[0].id))
             B.waiters.remove(best)
-            self.grant(best[0], j)
+            self.grant(best[0], best[2])
 
     # ---------- КДРВ ----------
     def want_kdrv(self, l):
@@ -328,8 +387,9 @@ class Engine:
         self.unload_events.append((t, self.unloaded_total))
         self.grant_kdrv()
         l.dir = -1
+        l.node = self.lane_e.m
         l.pending = self.loss_a
-        self.request_block(l, self.nb - 1, self.nb)
+        self.request_block(l, self.lane_e.m - 1, self.lane_e.m)
 
     # ---------- прогон ----------
     def run(self):
@@ -350,7 +410,7 @@ class Engine:
             self.deadlock = bool(stuck)
         self.t = self.horizon
         for l in self.locos:
-            x1 = l.node * self.Lb
+            x1 = self.pos_x(l)
             if l.state in MOVE and l.arr_t > l.state_t:
                 frac = min(1.0, (self.horizon - l.state_t) / (l.arr_t - l.state_t))
                 x1 = l.x0 + (l.dest_x - l.x0) * frac
@@ -482,14 +542,21 @@ def simulate(P, kind="shift", windows=None, horizon=None):
         "tracks": tracks,
         "state_names": STATE_NAMES,
         "route": {
-            "L_path": P["L_path"], "n_blocks": eng.nb,
-            "nodes": [i * eng.Lb for i in range(eng.nb + 1)],
+            "L_path": P["L_path"], "n_blocks": eng.lane_g.m,
+            "nodes": list(eng.lane_g.eq),
             "n_posts": int(P["n_posts"]),
             "post_xy": [10036, 33512], "kdrv_xy": [8156, 33295],
             "chord_m": math.hypot(10036 - 8156, 33512 - 33295),
         },
     }
     return res
+
+
+def _pos(parts):
+    pos = [0.0]
+    for x, _ in parts:
+        pos.append(pos[-1] + x)
+    return pos
 
 
 def scheme(P):
@@ -507,6 +574,7 @@ def scheme(P):
     v = K.speed_ms(P["v_kmh"], P["k_v"])
     nb = int(P["n_blocks"])
     Lb = P["L_path"] / nb
+    Lg, Le, S = K.lanes(P)
     n = int(P["n_wagons"])
     Lp = K.train_length(P["L_loco"], n, P["L_wag"])
     cap = K.loop_capacity(P["L_razm"], Lp, P["L_zap"])
@@ -515,7 +583,16 @@ def scheme(P):
     cyc = K.cycle_analytic(P)
     m_train = n * P["m_wag"]
     t_eff = (P["T_sm"] - P["t_to_start"] - P["t_to_end"]) * P["ktg"]
-    t_occ = (Lb + Lp) / v
+    # занятость блока за цикл: общий блок проходят оба состава, свободный блок — один
+    if S > 0:
+        pg = _split(Lg, P.get("x_obsh_g", 0.0), S, nb)
+        pe = _split(Le, P.get("x_obsh_p", 0.0), S, nb)
+        free_max = max([x for x, sh in pg + pe if not sh] or [0.0])
+        t_cyc_occ = max(2.0 * (S + Lp) / v, (free_max + Lp) / v)
+        t_occ = (S + Lp) / v
+    else:
+        t_occ = (Lb + Lp) / v
+        t_cyc_occ = 2.0 * t_occ
     links = [
         {"key": "locos", "name": "Электровозы Ferrit", "rate": P["n_loco"] * 3600.0 / cyc,
          "formula": "n_ЭВ · 3600 / t_ц"},
@@ -525,8 +602,8 @@ def scheme(P):
          "formula": "n_ПДМ · 3600 / (n · t_ПДМ)"},
         {"key": "kdrv", "name": "КДРВ №2", "rate": 3600.0 / P["t_unload"],
          "formula": "3600 / t_разгр"},
-        {"key": "track", "name": "Блок-участок (два прохода за цикл)", "rate": 3600.0 / (2.0 * t_occ),
-         "formula": "3600 / (2 · (L_б + L_п) / v)"},
+        {"key": "track", "name": "Блок-участок (два прохода за цикл)", "rate": 3600.0 / t_cyc_occ,
+         "formula": "3600 / (2 · (L_общ + L_п) / v)" if S > 0 else "3600 / (2 · (L_б + L_п) / v)"},
     ]
     low = min(links, key=lambda x: x["rate"])
     rate_min = low["rate"]
@@ -534,8 +611,9 @@ def scheme(P):
     return {
         "params": P,
         "geometry": {
-            "L_path": P["L_path"], "n_blocks": nb, "L_block": Lb,
-            "nodes": [i * Lb for i in range(nb + 1)],
+            "L_path": P["L_path"], "n_blocks": (len(pg) if S > 0 else nb), "L_block": Lb,
+            "L_gruz": Lg, "L_por": Le, "L_obsh": S,
+            "nodes": ([x * P["L_path"] / Lg for x in _pos(pg)] if S > 0 else [i * Lb for i in range(nb + 1)]),
             "L_train": Lp, "L_razm": P["L_razm"], "cap_loop": cap,
             "n_posts": int(P["n_posts"]),
             "post_xy": [10036, 33512], "kdrv_xy": [8156, 33295],
@@ -547,7 +625,7 @@ def scheme(P):
             "t_occ_block": t_occ,
         },
         "times": {
-            "t_load_train": t_load, "t_unload": P["t_unload"], "t_run_one_way": P["L_path"] / v + la + lb,
+            "t_load_train": t_load, "t_unload": P["t_unload"], "t_run_one_way": (Lg + Le) / 2.0 / v + la + lb,
             "cycle_analytic": cyc, "t_eff_shift": t_eff, "m_train": m_train,
         },
         "capacity": {

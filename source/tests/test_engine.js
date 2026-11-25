@@ -9,8 +9,8 @@ const LG = require(path.join(__dirname, '..', 'static', 'js', 'engine.js'));
 const D = LG.defaults();
 const near = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg || ''} ${a} != ${b}`);
 
-test('справочник: 203 параметра, значения проходят проверку', () => {
-  assert.equal(Object.keys(D).length, 203);
+test('справочник: 208 параметра, значения проходят проверку', () => {
+  assert.equal(Object.keys(D).length, 208);
   const v = LG.validate(D);
   assert.deepEqual(v.errors, []);
   assert.deepEqual(v.clean, D);
@@ -466,4 +466,49 @@ test('суточное планирование: плечо по маршрут�
   const R = Y.calc({ rows: [{ id: 'a', kind: 'ore', qty: 1000, from: '480:c16', to: '480:kdrv2', arm: null }, { id: 'b', kind: 'rock', qty: 200, from: '480:c16', to: '480:kdrv2', arm: 1000 }] }, ctx);
   near(R.ore.q, 1000, 1e-9); near(R.rock.tkm, 200, 1e-9, 'вручную 1000 м');
   near(R.ore.tkm, 1000 * legs / 1000, 1e-6, 'т·км по трассе');
+});
+
+/* ---------- раздельные пути гружёного и порожнего хода, общий участок (версия 0.14.0) ---------- */
+const LAN = Object.assign({}, D, { L_path: 3133, L_gruz: 2076.1, L_por: 4190.3, L_obsh: 756.2, x_obsh_g: 677.5, x_obsh_p: 2825.5 });
+
+test('полосы: нулевые параметры дают прежнюю модель', () => {
+  const a = LG.simulate(Object.assign({}, D, { n_loco: 6 }), 'shift');
+  const b = LG.simulate(Object.assign({}, D, { n_loco: 6, L_gruz: D.L_path, L_por: D.L_path, L_obsh: 0 }), 'shift');
+  assert.deepEqual(a.tracks, b.tracks);
+  assert.equal(a.kpi.trains, b.kpi.trains);
+});
+
+test('полосы: цикл одного электровоза = (L_гр + L_пор)/v + стоянки, без ожиданий', () => {
+  const r = LG.simulate(Object.assign({}, LAN, { n_loco: 1 }), 'shift');
+  const v = r.derived.v_ms;
+  near(r.derived.cycle_analytic, r.derived.t_load_train + LAN.t_unload + (2076.1 + 4190.3) / v + 2 * (r.derived.loss_accel + r.derived.loss_brake), 1e-6, 'аналитический цикл');
+  near(r.kpi.cycle_mean, r.derived.cycle_analytic, 1e-6, 'средний цикл');
+});
+
+test('полосы: баланс массы и отсутствие блокировок, 1…20 электровозов, 2 и 3 поста', () => {
+  for (let n = 1; n <= 20; n++) {
+    [2, 3].forEach(np => {
+      const r = LG.simulate(Object.assign({}, LAN, { n_loco: n, n_posts: np, n_loader: np === 3 ? 2 : 1 }), 'shift');
+      near(r.checks.balance_diff, 0, 1e-6, `n=${n} постов ${np}`);
+      assert.equal(r.checks.deadlock, false, `n=${n} постов ${np}`);
+    });
+  }
+});
+
+test('полосы: конфликт только на общем участке, приоритет у гружёных', () => {
+  const r = LG.simulate(Object.assign({}, LAN, { n_loco: 10 }), 'shift');
+  const names = r.state_names;
+  const wait = { g: 0, e: 0 };
+  r.tracks.forEach(tr => tr.forEach(s => {
+    const nm = names[s[2]];
+    if (nm === 'стоянка на разминовке' || nm === 'ожидание блок-участка' || nm === 'ожидание в выработке') wait[s[5] ? 'g' : 'e'] += s[1] - s[0];
+  }));
+  // порожний состав не вытесняет гружёного: порожние ждут не больше гружёных
+  assert.ok(wait.e <= wait.g + 1e-6, `ожидание порожних ${wait.e} > гружёных ${wait.g}`);
+  // шкала схемы: узлы гружёной полосы доходят до L_путь, общий блок виден одним ресурсом
+  assert.equal(r.route.nodes[r.route.nodes.length - 1], LAN.L_path);
+  const nb = r.resources.blocks.length;
+  const sc = LG.scheme(LAN);
+  assert.ok(nb >= 3 && nb <= 2 * LAN.n_blocks, 'число ресурсов блок-участков ' + nb);
+  assert.equal(sc.geometry.L_obsh, 756.2);
 });

@@ -103,11 +103,20 @@ def loading_train_time(p: dict) -> float:
     return p["t_post"] + p["n_wagons"] * (p["t_podacha"] + p["t_pdm"])
 
 
+def lanes(p: dict):
+    """Длины гружёного и порожнего пути и общего участка, м. Нулевые значения параметров означают L_path / весь путь."""
+    lg = p["L_gruz"] if p.get("L_gruz", 0) > 0 else p["L_path"]
+    le = p["L_por"] if p.get("L_por", 0) > 0 else p["L_path"]
+    s = p.get("L_obsh", 0.0)
+    return lg, le, (min(s, lg, le) if s > 0 else 0.0)
+
+
 def cycle_analytic(p: dict) -> float:
     """Цикл одного локомотива без ожиданий (тест T1), с.
 
     t_ц = t_погр.сост + t_разгр + 2·L/v + 2·(v/(2a) + v/(2b)).
     """
     v = speed_ms(p["v_kmh"], p["k_v"])
+    lg, le, _ = lanes(p)
     return (loading_train_time(p) + p["t_unload"]
-            + 2.0 * p["L_path"] / v + 2.0 * stop_loss(v, p["a"], p["b"]))
+            + (lg + le) / v + 2.0 * stop_loss(v, p["a"], p["b"]))

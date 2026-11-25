@@ -16,6 +16,7 @@
         note: 'Длина пути взята из маршрутов от 25.11.2026 (Dr. Joni подтвердил для отгрузки с АТУ): гружёный 1597 м по плану × k_изв 1,3 = 2076 м, порожний 3223 × 1,3 = 4190 м. Движок считает одну длину для обоих направлений, поэтому берётся среднее (2076 + 4190)/2 = 3133 м, и круговой пробег цикла сохраняется.',
         segments: [{ name: 'Путь С-20 → КДРВ №2 (маршруты 25.11.2026: среднее гружёного 2076 м и порожнего 4190 м)', L: 3133, i: 0, vg: null, vp: null }],
         arm: null,
+        lanes: { Lg: 2076.1, Le: 4190.3, S: 756.2, xg: 677.5, xe: 2825.5 },
         pockets: [
           { name: 'ПДМ ST1030 №1: С-1 → карман С-16', L: 143, kind: 'ore', share: 1 },
           { name: 'ПДМ ST1030 №1: С-1 → карман С-15', L: 151, kind: 'rock', share: 0.5 },
@@ -86,18 +87,29 @@
           if (g.length && g.every(p => p.share === 0)) errors.push(t + ': доли подвоза ' + (kd === 'ore' ? 'руды' : 'породы') + ' не могут быть все нулевыми');
         });
       }
+      let lanes = null;
+      if (d.lanes) {
+        const ls = b.lanes && typeof b.lanes === 'object' ? b.lanes : d.lanes;   // старые данные без полос получают значения по умолчанию
+        lanes = {};
+        [['Lg', 'длина гружёного пути'], ['Le', 'длина порожнего пути'], ['S', 'общий участок'], ['xg', 'начало общего участка (гружёный путь)'], ['xe', 'начало общего участка (порожний путь)']]
+          .forEach(k => { lanes[k[0]] = num(ls[k[0]], 0, 10000, t + ': ' + k[1] + ', м'); });
+      }
       let arm = null;
       if (d.arm) {
         if (!b.arm || typeof b.arm !== 'object') errors.push(t + ': нет плеча ПДМ');
         else arm = { name: text(b.arm.name, t + ': название плеча ПДМ'), L: num(b.arm.L, 0, 1000, t + ': плечо ПДМ, м') };
       }
       const note = typeof b.note === 'string' ? b.note.trim().slice(0, 400) : '';
-      out.push({ id: d.id, title, equipment: d.equipment, note, segments: segs, arm, pockets });
+      const ob = { id: d.id, title, equipment: d.equipment, note, segments: segs, arm, pockets };
+      if (lanes) ob.lanes = lanes;
+      out.push(ob);
     });
     return errors.length ? { errors, clean: null } : { errors: [], clean: { blocks: out } };
   }
 
   const block = (blocks, id) => blocks.blocks.find(b => b.id === id);
+  /* Параметры полос движения электровозов (гружёный и порожний путь, общий участок) или null */
+  const lanesOf = (blocks, id) => block(blocks, id).lanes || null;
   const totalLength = (blocks, id) => block(blocks, id).segments.reduce((s, x) => s + x.L, 0);
 
   /* ---------- формулы ---------- */
@@ -229,5 +241,5 @@
     return { blocks: res, trucks: tr };
   }
 
-  return { IDS, MAX_SEGMENTS, DEFAULTS, defaults, validate, block, totalLength, tt, tEffSG, pdm, shuttle, truckLoad, haul, lane, calcTrucks, calcBlocks };
+  return { IDS, MAX_SEGMENTS, DEFAULTS, defaults, validate, block, totalLength, lanesOf, tt, tEffSG, pdm, shuttle, truckLoad, haul, lane, calcTrucks, calcBlocks };
 }));

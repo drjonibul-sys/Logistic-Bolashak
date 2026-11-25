@@ -18,6 +18,7 @@ DEFAULT_BLOCKS = {
                 {"name": "Путь С-20 → КДРВ №2 (маршруты 25.11.2026: среднее гружёного 2076 м и порожнего 4190 м)", "L": 3133.0, "i": 0.0, "vg": None, "vp": None},
             ],
             "arm": None,
+            "lanes": {"Lg": 2076.1, "Le": 4190.3, "S": 756.2, "xg": 677.5, "xe": 2825.5},
             "pockets": [
                 {"name": "ПДМ ST1030 №1: С-1 → карман С-16", "L": 143.0, "kind": "ore", "share": 1.0},
                 {"name": "ПДМ ST1030 №1: С-1 → карман С-15", "L": 151.0, "kind": "rock", "share": 0.5},
@@ -111,6 +112,15 @@ def validate(data):
             vg = _num(s.get("vg"), 1, 40, lab + ": скорость гружёного, км/ч", errors, nullable=True)
             vp = _num(s.get("vp"), 1, 40, lab + ": скорость порожнего, км/ч", errors, nullable=True)
             cs.append({"name": name, "L": L, "i": i, "vg": vg, "vp": vp})
+        lanes = None
+        if d.get("lanes"):
+            ls = b.get("lanes")
+            if not isinstance(ls, dict):
+                ls = d["lanes"]  # старые данные без полос получают значения по умолчанию
+            lanes = {}
+            for key, nm in (("Lg", "длина гружёного пути"), ("Le", "длина порожнего пути"), ("S", "общий участок"),
+                            ("xg", "начало общего участка (гружёный путь)"), ("xe", "начало общего участка (порожний путь)")):
+                lanes[key] = _num(ls.get(key), 0, 10000, f"{t}: {nm}, м", errors)
         arm = None
         if d["arm"] is not None:
             a = b.get("arm")
@@ -143,11 +153,22 @@ def validate(data):
                 if g and all(p["share"] == 0 for p in g):
                     errors.append(f"{t}: доли подвоза {nm} не могут быть все нулевыми")
         note = b.get("note", d["note"])
-        out.append({"id": d["id"], "title": title, "equipment": d["equipment"],
-                    "note": note.strip()[:400] if isinstance(note, str) else "", "segments": cs, "arm": arm, "pockets": pockets})
+        ob = {"id": d["id"], "title": title, "equipment": d["equipment"],
+              "note": note.strip()[:400] if isinstance(note, str) else "", "segments": cs, "arm": arm, "pockets": pockets}
+        if lanes is not None:
+            ob["lanes"] = lanes
+        out.append(ob)
     if errors:
         return None, errors
     return {"blocks": out}, []
+
+
+def lanes(blocks, block_id):
+    """Параметры полос движения электровозов или None."""
+    for b in blocks["blocks"]:
+        if b["id"] == block_id:
+            return b.get("lanes")
+    raise KeyError(block_id)
 
 
 def total_length(blocks, block_id):
