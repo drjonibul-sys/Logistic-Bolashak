@@ -322,7 +322,7 @@ try:
         pg.click('nav.side a[href="kpi.html"]')
         pg.wait_for_selector('#kpiBox:not([hidden]) table')
         check('показатели: таблицы', pg.locator('#kpiBox table').count() >= 6, pg.locator('#kpiBox table').count())
-        check('показатели: плитки', pg.locator('#kpiBox .tile').count() == 4)
+        check('показатели: плитки', pg.locator('#kpiBox .tile').count() == 5)
         shot('05_kpi', True)
         pg.click('nav.side a[href="charts.html"]')
         pg.wait_for_selector('#chBox:not([hidden])')
@@ -500,7 +500,7 @@ try:
         pg.wait_for_function("() => document.querySelector('#resetMsg').textContent.startsWith('Значения по умолчанию')")
         go('/reference.html')
         pg.wait_for_selector('#refBox input')
-        check('сброс: n_loco = 7, n_posts = 2', pg.input_value('input[data-key=n_loco]') == '7' and pg.input_value('input[data-key=n_posts]') == '2')
+        check('сброс: n_loco = 7, n_posts = 1', pg.input_value('input[data-key=n_loco]') == '7' and pg.input_value('input[data-key=n_posts]') == '1')
 
         # перенос справочника текстом (только браузерная версия: там данные лежат в браузере)
         go('/admin.html')
@@ -510,7 +510,7 @@ try:
             import json
             pg.click('#btnMoveShow')
             vals = json.loads(pg.input_value('#moveText'))
-            check('перенос: показаны все 208 параметра', vals.get('n_loco') == 7 and len(vals) == 208, len(vals))
+            check('перенос: показаны все 209 параметра', vals.get('n_loco') == 7 and len(vals) == 209, len(vals))
             pg.fill('#moveText', '{oops')
             pg.click('#btnMoveLoad')
             pg.wait_for_function("() => document.querySelector('#moveMsg').textContent.length > 0 && document.querySelector('#moveMsg').classList.contains('err')")

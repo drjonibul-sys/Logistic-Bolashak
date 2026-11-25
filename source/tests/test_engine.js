@@ -9,8 +9,8 @@ const LG = require(path.join(__dirname, '..', 'static', 'js', 'engine.js'));
 const D = LG.defaults();
 const near = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg || ''} ${a} != ${b}`);
 
-test('справочник: 208 параметра, значения проходят проверку', () => {
-  assert.equal(Object.keys(D).length, 208);
+test('справочник: 209 параметров, значения проходят проверку', () => {
+  assert.equal(Object.keys(D).length, 209);
   const v = LG.validate(D);
   assert.deepEqual(v.errors, []);
   assert.deepEqual(v.clean, D);
