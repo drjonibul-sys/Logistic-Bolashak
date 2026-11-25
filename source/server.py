@@ -101,8 +101,11 @@ def reference_values():
     vals["L_path"] = min(max(BL.total_length(blocks_values(), "m480"), 100.0), 10000.0)
     ln = BL.lanes(blocks_values(), "m480")
     if ln:
-        vals["L_gruz"], vals["L_por"], vals["L_obsh"] = ln["Lg"], ln["Le"], ln["S"]
-        vals["x_obsh_g"], vals["x_obsh_p"] = ln["xg"], ln["xe"]
+        # значения блока −480 действуют, пока их не задали вручную в справочнике
+        mine = {"L_gruz": ln["Lg"], "L_por": ln["Le"], "L_obsh": ln["S"], "x_obsh_g": ln["xg"], "x_obsh_p": ln["xe"]}
+        for k, v in mine.items():
+            if not (isinstance(over, dict) and k in over):
+                vals[k] = v
     clean, errors = PR.validate(vals)
     return clean if not errors else PR.defaults()
 

@@ -109,7 +109,10 @@
     // длина пути электровозов задаётся суммой плеч блока −480 в справочнике выработок
     vals.L_path = Math.min(Math.max(BL.totalLength(blocksValues(), 'm480'), 100), 10000);
     const ln = BL.lanesOf(blocksValues(), 'm480');
-    if (ln) { vals.L_gruz = ln.Lg; vals.L_por = ln.Le; vals.L_obsh = ln.S; vals.x_obsh_g = ln.xg; vals.x_obsh_p = ln.xe; }
+    if (ln) {   // значения блока −480 действуют, пока их не задали вручную в справочнике
+      const mine = { L_gruz: ln.Lg, L_por: ln.Le, L_obsh: ln.S, x_obsh_g: ln.xg, x_obsh_p: ln.xe };
+      Object.keys(mine).forEach(k => { if (!(over && typeof over === 'object' && k in over)) vals[k] = mine[k]; });
+    }
     const v = LG.validate(vals);
     return v.errors.length ? LG.defaults() : v.clean;
   }
