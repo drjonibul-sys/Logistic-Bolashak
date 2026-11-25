@@ -14,7 +14,8 @@ function renderKpi(R) {
     tile(fmt(k.tonnes, 0) + ' т', 'выгружено на КДРВ', cls) +
     tile(pct(k.plan_pct), 'выполнение плана ' + fmt(d.plan_total, 0) + ' т', cls) +
     tile(fmt(k.trains, 0), 'составов выгружено') +
-    tile(pct(k.util_mean), 'средняя загрузка электровозов') + '</div>';
+    tile(pct(k.util_mean), 'средняя загрузка электровозов') +
+    (R.max_perf ? tile(fmt(R.max_perf.tonnes_max, 0) + ' т', 'максимум за смену по техническим параметрам', 'ok') : '') + '</div>';
   h += '<div class="cards"><div>';
   h += '<h3>Основные показатели</h3><table>';
   h += row('Составов выгружено на КДРВ', fmt(k.trains, 0));
@@ -24,6 +25,12 @@ function renderKpi(R) {
   h += row('Производительность за горизонт, т/ч', fmt(k.q_horizon, 1));
   h += row('Производительность в окне работы, т/ч', fmt(k.q_window, 1));
   h += row('Составов, нужных для плана', fmt(k.trains_needed, 1));
+  const mp = R.max_perf;
+  if (mp) {
+    h += row('Максимум за смену по техническим параметрам, т', `<b>${fmt(mp.tonnes_max, 0)}</b> (${fmt(mp.trains_max, 1)} состава)`);
+    h += row('Расчётный выпуск за смену, т', `${fmt(mp.tonnes_actual, 0)} (${pct(mp.pct_of_max)} от максимума)`);
+    h += row('Лимитирующее звено', `${esc(mp.bottleneck_name)}: ${fmt(mp.rate_max, 2)} составов/ч`);
+  }
   h += row('Загрузка электровозов (среднее)', pct(k.util_mean));
   h += row('Цикл электровоза, мин: средний / мин / макс', `${mins(k.cycle_mean)} / ${mins(k.cycle_min)} / ${mins(k.cycle_max)}`);
   h += row('Цикл без ожиданий (аналитический), мин', mins(d.cycle_analytic));
@@ -59,6 +66,11 @@ function renderKpi(R) {
   h += row('Взаимная блокировка составов', `<span class="flag ${c.deadlock ? 'bad' : 'ok'}">${c.deadlock ? 'обнаружена' : 'нет'}</span>`);
   h += '</table></div></div>';
 
+  if (mp) {
+    h += '<h3>Максимальная производительность по техническим параметрам</h3><div class="scroll"><table><tr><th>Звено</th><th>Составов/ч</th><th>т за смену</th></tr>';
+    mp.links.forEach(x => { h += `<tr><td>${esc(x.name)}${x.key === mp.bottleneck ? ' <b>(лимит)</b>' : ''}</td><td>${fmt(x.rate, 2)}</td><td>${fmt(x.tonnes_shift, 0)}</td></tr>`; });
+    h += `</table></div><p class="hint">Q_макс = min(звенья) · T_эф / 3600 · n · m_в = ${fmt(mp.rate_max, 2)} · ${fmt(mp.t_eff_shift / 3600, 2)} · ${fmt(R.params.n_wagons, 0)} · ${fmt(R.params.m_wag, 1)} = ${fmt(mp.tonnes_max, 0)} т за смену. Звенья: электровозы n_ЭВ·3600/t_ц, посты n_пост·3600/t_погр.сост, ПДМ n_ПДМ·3600/(n·t_ПДМ), КДРВ 3600/t_разгр, блок-участок 3600/(2·(L_общ+L_п)/v). Это предел для изолированной работы звена без ожиданий; имитация даёт меньше из-за пуска первого цикла и очередей.</p>`;
+  }
   h += '<h3>Электровозы</h3><div class="scroll"><table><tr><th>№</th><th>Составов</th><th>Руда, т</th><th>Загрузка</th><th>Ожид. поста</th><th>Ожид. ПДМ</th><th>Ожид. КДРВ</th><th>Ожид. блок-участка</th><th>Разминовка</th><th>Цикл, мин</th></tr>';
   R.locos.forEach(l => {
     const s = l.share;

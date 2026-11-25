@@ -538,6 +538,7 @@ def simulate(P, kind="shift", windows=None, horizon=None):
             "balance_diff": eng.loaded_total - eng.unloaded_total - in_transit,
             "deadlock": eng.deadlock,
         },
+        "max_perf": max_perf(P, tonnes, n_shifts),
         "series": series,
         "tracks": tracks,
         "state_names": STATE_NAMES,
@@ -557,6 +558,26 @@ def _pos(parts):
     for x, _ in parts:
         pos.append(pos[-1] + x)
     return pos
+
+
+def max_perf(P, tonnes, n_shifts):
+    """Максимальная производительность по техническим параметрам, т за смену.
+
+    Звено с наименьшей пропускной способностью (scheme) за эффективное время смены:
+    N_макс = min(звенья)·T_эф/3600 составов, Q_макс = N_макс·n·m_в. Расчётный выпуск за смену Q = Q_расч/число смен."""
+    c = scheme(P)["capacity"]
+    m_train = int(P["n_wagons"]) * P["m_wag"]
+    t_eff = (P["T_sm"] - P["t_to_start"] - P["t_to_end"]) * P["ktg"]
+    low = next(x for x in c["links"] if x["key"] == c["bottleneck"])
+    actual = tonnes / n_shifts
+    return {
+        "bottleneck": c["bottleneck"], "bottleneck_name": low["name"], "formula": low["formula"],
+        "rate_max": c["rate_min"], "t_eff_shift": t_eff, "trains_max": c["trains_ref"],
+        "tonnes_max": c["tonnes_ref"], "tonnes_actual": actual,
+        "pct_of_max": actual / c["tonnes_ref"] if c["tonnes_ref"] else None,
+        "links": [{"key": x["key"], "name": x["name"], "rate": x["rate"], "tonnes_shift": x["rate"] * t_eff / 3600.0 * m_train}
+                  for x in c["links"]],
+    }
 
 
 def scheme(P):

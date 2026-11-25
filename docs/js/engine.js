@@ -563,12 +563,29 @@
         loaded_total: eng.loadedTotal, unloaded_total: eng.unloadedTotal, in_transit: inTransit,
         balance_diff: eng.loadedTotal - eng.unloadedTotal - inTransit, deadlock: eng.deadlock,
       },
+      max_perf: maxPerf(P, tonnes, nShifts),
       series, tracks, state_names: STATE_NAMES.slice(),
       route: {
         L_path: P.L_path, n_blocks: eng.laneG.m, nodes, n_posts: Math.trunc(P.n_posts),
         post_xy: [10036, 33512], kdrv_xy: [8156, 33295],
         chord_m: Math.hypot(10036 - 8156, 33512 - 33295),
       },
+    };
+  }
+
+  /* Максимальная производительность по техническим параметрам, т за смену (sim/engine.py: max_perf). */
+  function maxPerf(P, tonnes, nShifts) {
+    const c = scheme(P).capacity;
+    const mTrain = Math.trunc(P.n_wagons) * P.m_wag;
+    const tEff = (P.T_sm - P.t_to_start - P.t_to_end) * P.ktg;
+    const low = c.links.find(x => x.key === c.bottleneck);
+    const actual = tonnes / nShifts;
+    return {
+      bottleneck: c.bottleneck, bottleneck_name: low.name, formula: low.formula,
+      rate_max: c.rate_min, t_eff_shift: tEff, trains_max: c.trains_ref,
+      tonnes_max: c.tonnes_ref, tonnes_actual: actual,
+      pct_of_max: c.tonnes_ref ? actual / c.tonnes_ref : null,
+      links: c.links.map(x => ({ key: x.key, name: x.name, rate: x.rate, tonnes_shift: x.rate * tEff / 3600 * mTrain })),
     };
   }
 

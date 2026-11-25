@@ -512,3 +512,13 @@ test('полосы: конфликт только на общем участке
   assert.ok(nb >= 3 && nb <= 2 * LAN.n_blocks, 'число ресурсов блок-участков ' + nb);
   assert.equal(sc.geometry.L_obsh, 756.2);
 });
+
+test('максимум за смену по техническим параметрам совпадает со схемой и входит в расчёт', () => {
+  const r = LG.simulate(Object.assign({}, D), 'shift');
+  const c = LG.scheme(D).capacity;
+  near(r.max_perf.tonnes_max, c.tonnes_ref, 1e-9, 'Q_макс');
+  assert.equal(r.max_perf.bottleneck, c.bottleneck);
+  near(r.max_perf.pct_of_max, r.kpi.tonnes / c.tonnes_ref, 1e-12, 'доля от максимума');
+  const day = LG.simulate(Object.assign({}, D), 'day');
+  near(day.max_perf.tonnes_actual, day.kpi.tonnes / 2, 1e-9, 'выпуск за смену в суточном расчёте');
+});
