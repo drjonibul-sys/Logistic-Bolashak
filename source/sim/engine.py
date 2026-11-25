@@ -262,7 +262,7 @@ class Engine:
             self.loader_cnt += 1
             l.load_t0 = self.t
             self.set_state(l, "погрузка")
-            self.at(self.t + self.P["t_pdm"], self.end_load_wagon, l)
+            self.at(self.t + K.wagon_load_time(self.P), self.end_load_wagon, l)
         self.logq()
 
     def end_load_wagon(self, l):
@@ -617,9 +617,9 @@ def scheme(P):
     links = [
         {"key": "locos", "name": "Электровозы Ferrit", "rate": P["n_loco"] * 3600.0 / cyc,
          "formula": "n_ЭВ · 3600 / t_ц"},
-        {"key": "posts", "name": "Посты погрузки С-14, С-15", "rate": P["n_posts"] * 3600.0 / t_load,
+        {"key": "posts", "name": "Пост прямой погрузки с АТУ (С-20)" if int(P["n_posts"]) == 1 else "Посты погрузки С-14, С-15", "rate": P["n_posts"] * 3600.0 / t_load,
          "formula": "n_пост · 3600 / t_погр.сост"},
-        {"key": "loader", "name": "ПДМ ST1030 №2", "rate": P["n_loader"] * 3600.0 / (n * P["t_pdm"]),
+        {"key": "loader", "name": "ПДМ ST1030 №2", "rate": P["n_loader"] * 3600.0 / (n * K.wagon_load_time(P)),
          "formula": "n_ПДМ · 3600 / (n · t_ПДМ)"},
         {"key": "kdrv", "name": "КДРВ №2", "rate": 3600.0 / P["t_unload"],
          "formula": "3600 / t_разгр"},

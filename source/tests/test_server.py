@@ -309,8 +309,8 @@ class TestResultSharing(ServerCase):
         c = Client()
         st, js, _, _ = c.call("GET", "/api/scheme")
         self.assertEqual(st, 200)
-        # при L_путь 3133 м (маршруты 25.11.2026) узкое место — электровозы, а не ПДМ
-        self.assertEqual(js["capacity"]["bottleneck"], "locos")
+        # прямая погрузка с АТУ (С-20): один пост, он и ограничивает выпуск
+        self.assertEqual(js["capacity"]["bottleneck"], "posts")
         self.assertEqual(len(js["geometry"]["nodes"]), js["geometry"]["n_blocks"] + 1)
         self.assertAlmostEqual(js["times"]["t_eff_shift"], 26496.0, 3)
 

@@ -30,7 +30,7 @@ function drawCharts() {
   const rows = [];
   R.locos.forEach(l => rows.push({ label: 'Электровоз ' + l.id, value: l.util, color: '#3b82c4' }));
   r.blocks.forEach((x, i) => rows.push({ label: 'Блок-участок ' + (i + 1), value: x, color: '#98a6b3' }));
-  r.posts.forEach((x, i) => rows.push({ label: 'Пост ' + postName(i), value: x, color: '#8e7cc3' }));
+  r.posts.forEach((x, i) => rows.push({ label: 'Пост ' + postName(i, R.params.n_posts), value: x, color: '#8e7cc3' }));
   rows.push({ label: 'ПДМ ST1030 №2', value: r.loader, color: '#6a4fb3' });
   rows.push({ label: 'КДРВ №2', value: r.kdrv, color: '#2e9e6b' });
   barChart($('#cvUtil'), rows, 1, '%');

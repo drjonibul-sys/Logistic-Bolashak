@@ -102,7 +102,7 @@ def reference_values():
     ln = BL.lanes(blocks_values(), "m480")
     if ln:
         # значения блока −480 действуют, пока их не задали вручную в справочнике
-        mine = {"L_gruz": ln["Lg"], "L_por": ln["Le"], "L_obsh": ln["S"], "x_obsh_g": ln["xg"], "x_obsh_p": ln["xe"]}
+        mine = {"L_gruz": ln["Lg"], "L_por": ln["Le"], "L_obsh": ln["S"], "x_obsh_g": ln["xg"], "x_obsh_p": ln["xe"], "n_posts": int(round(ln["posts"]))}
         for k, v in mine.items():
             if not (isinstance(over, dict) and k in over):
                 vals[k] = v

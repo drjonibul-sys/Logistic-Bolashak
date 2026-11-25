@@ -118,7 +118,7 @@ try:
         pg.wait_for_selector('#bnCard h3')
         pg.wait_for_selector('#paramCard h3')
         check('обзор: расчёта нет', 'ещё не выполнялся' in pg.inner_text('#lastCard'))
-        check('обзор: узкое место', 'ПДМ ST1030' in pg.inner_text('#bnCard'), pg.inner_text('#bnCard')[:80])
+        check('обзор: узкое место', 'прямой погрузки' in pg.inner_text('#bnCard'), pg.inner_text('#bnCard')[:80])
         check('обзор: карта разделов', pg.locator('#sitemap a').count() == 13, pg.locator('#sitemap a').count())
         shot('01_index_empty')
 

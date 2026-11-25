@@ -98,9 +98,14 @@ def position_on_edge(tau: float, length: float, v: float, a: float, b: float) ->
     return length - b * (total - tau) ** 2 / 2.0
 
 
+def wagon_load_time(p: dict) -> float:
+    """Время погрузки одной вагонетки, с: один ковш — одна вагонетка, t = n_ков · t_ПДМ (n_ков по умолчанию 1)."""
+    return p.get("n_kov", 1) * p["t_pdm"]
+
+
 def loading_train_time(p: dict) -> float:
     """t_погр.сост = t_пост + n·(t_подача + t_ц,ПДМ), с (без ожиданий)."""
-    return p["t_post"] + p["n_wagons"] * (p["t_podacha"] + p["t_pdm"])
+    return p["t_post"] + p["n_wagons"] * (p["t_podacha"] + wagon_load_time(p))
 
 
 def lanes(p: dict):

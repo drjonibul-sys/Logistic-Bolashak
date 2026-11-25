@@ -522,3 +522,32 @@ test('максимум за смену по техническим параме�
   const day = LG.simulate(Object.assign({}, D), 'day');
   near(day.max_perf.tonnes_actual, day.kpi.tonnes / 2, 1e-9, 'выпуск за смену в суточном расчёте');
 });
+
+/* ---------- прямая погрузка с АТУ: один состав, один ковш на вагонетку (версия 0.15.0) ---------- */
+test('один ковш — одна вагонетка: время погрузки вагонетки = n_ков · t_ПДМ', () => {
+  const p1 = Object.assign({}, D, { n_loco: 1 }), p2 = Object.assign({}, p1, { n_kov: 2 });
+  const a = LG.simulate(p1, 'shift'), b = LG.simulate(p2, 'shift');
+  near(b.derived.t_load_train - a.derived.t_load_train, D.n_wagons * D.t_pdm, 1e-9, 'добавка времени погрузки состава');
+  near(b.derived.cycle_analytic - a.derived.cycle_analytic, D.n_wagons * D.t_pdm, 1e-9, 'цикл электровоза');
+});
+
+test('прямая погрузка с АТУ: на посту один состав, остальные ждут', () => {
+  const base = Object.assign({}, D, { n_loco: 7, n_posts: 1 });
+  const r = LG.simulate(base, 'shift');
+  assert.equal(r.resources.posts.length, 1);
+  assert.equal(r.checks.deadlock, false);
+  near(r.checks.balance_diff, 0, 1e-6, 'баланс');
+  // ни в один момент не стоит под погрузкой больше одного состава
+  const names = r.state_names;
+  const ev = [];
+  r.tracks.forEach(tr => tr.forEach(s => {
+    if (['постановка под погрузку', 'подача вагона', 'погрузка', 'ожидание ПДМ'].includes(names[s[2]]) && s[6] >= 0) { ev.push([s[0], 1]); ev.push([s[1], -1]); }
+  }));
+  ev.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  let cur = 0, mx = 0;
+  ev.forEach(e => { cur += e[1]; if (cur > mx) mx = cur; });
+  assert.ok(mx <= 1, 'одновременно под погрузкой ' + mx);
+  const two = LG.simulate(Object.assign({}, base, { n_posts: 2 }), 'shift');
+  assert.ok(two.kpi.tonnes >= r.kpi.tonnes, 'два поста не дают меньше одного');
+  assert.equal(LG.scheme(base).capacity.links.find(x => x.key === 'posts').name, 'Пост прямой погрузки с АТУ (С-20)');
+});

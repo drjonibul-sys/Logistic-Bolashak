@@ -58,7 +58,8 @@
     brakePath: (v, b) => v * v / (2 * b),
     trainLength: (lLoco, n, lWag) => lLoco + n * lWag,
     loopCapacity: (lRazm, lTrain, lReserve) => Math.floor(lRazm / (lTrain + lReserve)),
-    loadingTrainTime: p => p.t_post + p.n_wagons * (p.t_podacha + p.t_pdm),
+    wagonLoadTime: p => (p.n_kov || 1) * p.t_pdm,   // один ковш — одна вагонетка: n_ков · t_ПДМ
+    loadingTrainTime: p => p.t_post + p.n_wagons * (p.t_podacha + K.wagonLoadTime(p)),
     /* длины гружёного и порожнего пути и общего участка; нулевые параметры означают L_path / весь путь */
     lanes(p) {
       const lg = p.L_gruz > 0 ? p.L_gruz : p.L_path, le = p.L_por > 0 ? p.L_por : p.L_path;
@@ -300,7 +301,7 @@
         this.loaderCnt += 1;
         l.loadT0 = this.t;
         this.setState(l, 'погрузка');
-        this.at(this.t + this.P.t_pdm, this.endLoadWagon, [l]);
+        this.at(this.t + K.wagonLoadTime(this.P), this.endLoadWagon, [l]);
       }
       this.logq();
     }
@@ -615,8 +616,8 @@
     } else { tOcc = (Lb + Lp) / v; tCycOcc = 2 * tOcc; }
     const links = [
       { key: 'locos', name: 'Электровозы Ferrit', rate: P.n_loco * 3600 / cyc, formula: 'n_ЭВ · 3600 / t_ц' },
-      { key: 'posts', name: 'Посты погрузки С-14, С-15', rate: P.n_posts * 3600 / tLoad, formula: 'n_пост · 3600 / t_погр.сост' },
-      { key: 'loader', name: 'ПДМ ST1030 №2', rate: P.n_loader * 3600 / (n * P.t_pdm), formula: 'n_ПДМ · 3600 / (n · t_ПДМ)' },
+      { key: 'posts', name: Math.trunc(P.n_posts) === 1 ? 'Пост прямой погрузки с АТУ (С-20)' : 'Посты погрузки С-14, С-15', rate: P.n_posts * 3600 / tLoad, formula: 'n_пост · 3600 / t_погр.сост' },
+      { key: 'loader', name: 'ПДМ ST1030 №2', rate: P.n_loader * 3600 / (n * K.wagonLoadTime(P)), formula: 'n_ПДМ · 3600 / (n · t_ПДМ)' },
       { key: 'kdrv', name: 'КДРВ №2', rate: 3600 / P.t_unload, formula: '3600 / t_разгр' },
       { key: 'track', name: 'Блок-участок (два прохода за цикл)', rate: 3600 / tCycOcc, formula: S > 0 ? '3600 / (2 · (L_общ + L_п) / v)' : '3600 / (2 · (L_б + L_п) / v)' },
     ];

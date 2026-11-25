@@ -110,7 +110,7 @@
     vals.L_path = Math.min(Math.max(BL.totalLength(blocksValues(), 'm480'), 100), 10000);
     const ln = BL.lanesOf(blocksValues(), 'm480');
     if (ln) {   // значения блока −480 действуют, пока их не задали вручную в справочнике
-      const mine = { L_gruz: ln.Lg, L_por: ln.Le, L_obsh: ln.S, x_obsh_g: ln.xg, x_obsh_p: ln.xe };
+      const mine = { L_gruz: ln.Lg, L_por: ln.Le, L_obsh: ln.S, x_obsh_g: ln.xg, x_obsh_p: ln.xe, n_posts: Math.round(ln.posts) };
       Object.keys(mine).forEach(k => { if (!(over && typeof over === 'object' && k in over)) vals[k] = mine[k]; });
     }
     const v = LG.validate(vals);

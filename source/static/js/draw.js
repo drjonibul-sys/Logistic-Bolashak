@@ -71,7 +71,7 @@ function drawRouteBase(g, w, route, F, occ) {
     g.fillStyle = cssVar('--bg'); g.strokeStyle = line;
     g.fillRect(w - padR + 4, yy - 13, padR - 14, 26); g.strokeRect(w - padR + 4, yy - 13, padR - 14, 26);
     g.fillStyle = muted; g.textAlign = 'right';
-    g.fillText(postName(p), w - 18, yy);
+    g.fillText(postName(p, np), w - 18, yy);
     g.textAlign = 'left';
   }
   g.fillStyle = muted;

@@ -16,7 +16,7 @@ function findingsOf(R) {
     out.push('Ожиданий в расчёте нет.');
   }
   const res = [];
-  r.posts.forEach((x, i) => res.push([`пост ${postName(i)}`, x]));
+  r.posts.forEach((x, i) => res.push([`пост ${postName(i, (R && R.params ? R.params.n_posts : 0))}`, x]));
   res.push(['ПДМ ST1030 №2', r.loader], ['КДРВ №2', r.kdrv]);
   r.blocks.forEach((x, i) => res.push([`блок-участок ${i + 1}`, x]));
   const hot = res.slice().sort((a, b) => b[1] - a[1])[0];

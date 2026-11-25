@@ -58,6 +58,11 @@ def make_jobs():
         ("lanes-shared-at-end", dict(lan, x_obsh_g=2076.1 - 756.2, x_obsh_p=4190.3 - 756.2, n_loco=8), "shift"),
         ("lanes-slow-3posts", dict(lan, k_v=0.4, n_posts=3, n_loader=2, n_loco=10), "shift"),
     ]
+    # прямая погрузка с АТУ: один пост, несколько ковшей на вагонетку
+    jobs += [("direct-atu-1post", dict(lan, n_posts=1, n_loco=7), "shift"),
+             ("direct-atu-day", dict(lan, n_posts=1, n_loco=5), "day"),
+             ("two-buckets-per-wagon", dict(lan, n_kov=2, n_loco=7), "shift"),
+             ("direct-atu-two-buckets", dict(lan, n_posts=1, n_kov=2, n_loader=2, n_loco=6), "shift")]
     rnd = random.Random(20261024)
     meta = PR.meta()
     for i in range(40):

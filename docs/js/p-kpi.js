@@ -53,7 +53,7 @@ function renderKpi(R) {
   const r = R.resources;
   h += '<h3>Загрузка ресурсов в окнах работы</h3><table>';
   r.blocks.forEach((x, i) => { h += row('Блок-участок ' + (i + 1), pct(x)); });
-  r.posts.forEach((x, i) => { h += row('Пост ' + postName(i), pct(x)); });
+  r.posts.forEach((x, i) => { h += row('Пост ' + postName(i, R.params.n_posts), pct(x)); });
   h += row('ПДМ ST1030 №2 (только погрузка вагонов)', pct(r.loader));
   h += row('КДРВ №2', pct(r.kdrv));
   h += row('Наибольшая очередь: посты / ПДМ / КДРВ', `${r.q_post_max} / ${r.q_loader_max} / ${r.q_kdrv_max}`);

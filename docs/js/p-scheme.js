@@ -29,7 +29,7 @@ function renderTables() {
   const nb = geo.n_blocks;
   let h = '<tr><th>Узел</th><th>Назначение</th><th>От постов, м</th><th>До КДРВ, м</th></tr>';
   geo.nodes.forEach((x, i) => {
-    const name = i === 0 ? 'Посты погрузки (С-14, С-15)' : i === nb ? 'КДРВ №2' : `Разминовка, ёмкость ${geo.cap_loop} сост.`;
+    const name = i === 0 ? (geo.n_posts === 1 ? 'Пост прямой погрузки с АТУ (С-20)' : 'Посты погрузки (С-14, С-15)') : i === nb ? 'КДРВ №2' : `Разминовка, ёмкость ${geo.cap_loop} сост.`;
     h += `<tr><td>${i}</td><td class="l">${name}</td><td>${fmt(x, 0)}</td><td>${fmt(geo.L_path - x, 0)}</td></tr>`;
   });
   $('#tblNodes').innerHTML = h;
