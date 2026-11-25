@@ -36,12 +36,25 @@ function render() {
   const ids = Object.keys(order).length;
   h += '<section class="card"><h3>1. Узлы по чертежу</h3>' + table(['Наименование на чертеже', 'Вид', 'X, м', 'Y, м', 'Номер на трассе ЭВ'],
     PL.NODES.map(n => `<tr${n.route ? ' class="hl"' : ''}><td class="l">${inp(n.id, 'name', n.name)}</td><td class="l">${esc(PL.K[n.kind])}${n.custom ? ' (свой)' : ''}</td><td>${inp(n.id, 'x', fmt(n.x, 1).replace(/\s/g, '').replace(',', '.'))}</td><td>${inp(n.id, 'y', fmt(n.y, 1).replace(/\s/g, '').replace(',', '.'))}</td><td>${order[n.id] || '—'}</td></tr>`)) +
-    `<p class="hint">Подсвечены ${ids} узлов трассы электровозов: от постов у карманов С-14, С-15 до КДРВ №2. Остальные узлы показаны для привязки. Координаты — система плана.</p></section>`;
+    `<p class="hint">Подсвечены ${ids} узлов гружёной трассы электровозов (погрузка С-20 → КДРВ-2). Порожний путь и КДРВ-1 даны в таблицах 2а–2г. Остальные узлы показаны для привязки. Координаты — конец выноски на чертеже, система плана.</p></section>`;
   /* 2. участки трассы */
-  h += '<section class="card"><h3>2. Участки трассы электровозов</h3>' + table(['Участок', 'Длина по схеме, м', 'Накоплено, м', 'Модельная длина, м'],
+  h += '<section class="card"><h3>2. Участки гружёной трассы электровозов (КДРВ-2)</h3>' + table(['Участок', 'Длина по схеме, м', 'Накоплено, м', 'Модельная длина, м'],
     legs.map(l => `<tr><td class="l">${esc(l.from.name)} → ${esc(l.to.name)}</td><td>${fmt(l.L, 0)}</td><td>${fmt(l.s1, 0)}</td><td>${fmt(l.Lm, 0)}</td></tr>`)
       .concat([`<tr class="hl"><td class="l">Итого</td><td>${fmt(PL.RT.L, 0)}</td><td></td><td>${fmt(Lp, 0)}</td></tr>`])) +
     `<p class="hint">Длина по схеме — сумма хорд между подписанными узлами, она короче реальной выработки. В расчёте путь электровозов задан параметром L<sub>путь</sub> = ${fmt(Lp, 0)} м (условно, раздел 13.6): модельная длина участка = L<sub>участка</sub> / ΣL · L<sub>путь</sub>. Когда будет получен перечень выработок (G1), длины участков заменят условное значение.</p></section>`;
+  /* 2а. маршруты составов: порожний и гружёный для КДРВ-1 и КДРВ-2 */
+  const kd = P.d_k_dev || 1.3;
+  let cn = 0;
+  [1, 2].forEach(k => ['empty', 'loaded'].forEach(dir => {
+    const c = PL.cycleLegs(k, dir, kd);
+    h += `<section class="card"><h3>2${'абвг'[cn++]}. ${dir === 'empty' ? 'Порожний состав' : 'Гружёный состав'}: ${esc(PL.CYC[k].name)}</h3>` +
+      `<p class="hint">${dir === 'empty' ? 'От разгрузки на погрузку (сопряжение С-20, прямая погрузка с АТУ).' : 'От погрузки (сопряжение С-20) к разгрузке.'}</p>` +
+      table(['№', 'Узел (по чертежу от 26.09.2026)', 'Участок до узла, м', 'Накоплено, м', 'С учётом k<sub>изв</sub>, м'],
+        [`<tr><td>1</td><td class="l">${esc(PL.byId[PL.CYC[k][dir][0]].name)}</td><td>—</td><td>0</td><td>0</td></tr>`].concat(c.legs.map((l, i) =>
+          `<tr><td>${i + 2}</td><td class="l">${esc(l.to.name)}</td><td>${fmt(l.L, 0)}</td><td>${fmt(l.cum, 0)}</td><td>${fmt(l.cumK, 0)}</td></tr>`))
+        .concat([`<tr class="hl"><td></td><td class="l">Итого, ${PL.CYC[k][dir].length} узлов</td><td></td><td>${fmt(c.L, 0)}</td><td>${fmt(c.Lk, 0)}</td></tr>`])) +
+      `</section>`;
+  }));
   /* 3. плечи из справочника блоков */
   const rows = [];
   BL.blocks.forEach(b => {

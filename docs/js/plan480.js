@@ -28,8 +28,8 @@
     ['c16', 'Карман С-16 (руда)', 9357.7, 33758.4, 'pocket', 0, null],
     ['c15', 'Карман С-15 (порода)', 9370.3, 33756.5, 'pocket', 0, null],
     ['c14', 'Карман С-14 (порода)', 9385.2, 33757.3, 'pocket', 1, [-6, 36, 'r']],
-    ['s55', 'Сопряжение С-55 (ПК-22/23 штрека)', 9262.0, 33742.0, 'junc', 0, null],
-    ['s20', 'Сопряжение С-20, зона погрузки ПДМ', 9342.0, 33729.0, 'junc', 0, null],
+    ['s55', 'Сопряжение С-55 (62)', 9267.4, 33747.1, 'junc', 0, null],
+    ['s20', 'Сопряжение С-20 (прямая погрузка с АТУ)', 9337.3, 33726.3, 'junc', 0, [-8, 18, 'c']],
     ['atu', 'Начало АТУ (ПК-0)', 9261.0, 33754.7, 'junc', 0, null],
     ['p402', 'Заезд на п/э −402 м (конец АТУ)', 9636.0, 33450.2, 'junc', 0, [10, 4, 'l']],
     ['yz', 'Юго-Западный штрек (центр)', 9570.8, 33485.1, 'drift', 0, null],
@@ -57,13 +57,54 @@
     ['zsh1', 'Штрек заезд 1', 9868.3, 33325.5, 'junc', 0, null],
     ['zsh2', 'Штрек заезд 2', 9992.4, 33387.2, 'junc', 0, null],
     ['ort81', 'Орт-81', 9707.6, 33453.5, 'drift', 0, null],
+    /* Сопряжения маршрутов составов по выноскам чертежа от 26.09.2026 (координаты — конец выноски; число в скобках — как на чертеже) */
+    ['rs1', 'Рудоспуск №1 (КДРВ-1, разгрузка)', 8006.5, 33404.9, 'dump', 0, [-8, 0, 'r']],
+    ['rs2', 'Рудоспуск №2 (КДРВ-2, разгрузка)', 8053.4, 33409.8, 'dump', 0, [-8, 0, 'r']],
+    ['j3a', 'Сопряжение С-3 (порожняковая ветвь КДРВ-1)', 8010.7, 33549.1, 'junc', 0, [-8, 0, 'r']],
+    ['j2a', 'Сопряжение С-2', 8049.8, 33552.4, 'junc', 0, [0, -12, 'c']],
+    ['j1b', 'Сопряжение С-1 (46)', 8043.9, 33513.1, 'junc', 0, [-8, 0, 'r']],
+    ['j8', 'Сопряжение С-8 (48)', 8240.4, 33573.8, 'junc', 0, [0, -12, 'c']],
+    ['j7', 'Сопряжение С-7 (47)', 8332.5, 33530.5, 'junc', 0, [12, 0, 'l']],
+    ['j6', 'Сопряжение С-6 (58)', 8366.3, 33535.0, 'junc', 0, [12, 0, 'l']],
+    ['j5', 'Сопряжение С-5 (46)', 8317.7, 33498.3, 'junc', 0, [12, 0, 'l']],
+    ['j4', 'Сопряжение С-4 (50)', 8256.6, 33451.9, 'junc', 0, [12, 0, 'l']],
+    ['zop', 'Заезд на опрокиды', 8232.6, 33403.4, 'junc', 0, [12, 0, 'l']],
+    ['j3b', 'Сопряжение С-3 (50)', 8099.4, 33308.1, 'junc', 0, [0, -12, 'c']],
+    ['j37', 'Сопряжение С-37', 8040.7, 33302.1, 'junc', 0, [-8, 0, 'r']],
+    ['j9', 'Сопряжение С-9 (59)', 8838.2, 33873.5, 'junc', 0, [0, 14, 'c']],
+    ['j52', 'Сопряжение С-52 (44)', 8887.5, 33863.2, 'junc', 0, [0, 14, 'c']],
+    ['j53', 'Сопряжение С-53 (47)', 8886.2, 33907.3, 'junc', 0, [-8, 0, 'r']],
+    ['gk1b', 'Грузовой квершлаг 1 (верхний участок)', 8960.5, 34002.8, 'drift', 0, null],
+    ['j10', 'Сопряжение С-10 (45)', 8991.1, 34052.7, 'junc', 0, [-8, 0, 'r']],
+    ['ok1', 'Откаточный квершлаг 1', 9392.1, 34274.4, 'drift', 0, null],
+    ['j50', 'Сопряжение С-50', 9428.5, 34295.0, 'junc', 0, [0, -12, 'c']],
+    ['osv1', 'Откаточный штрек Восточный (запад)', 9500.2, 34270.7, 'drift', 0, null],
+    ['j47', 'Сопряжение С-47', 9546.5, 34242.9, 'junc', 0, [0, 14, 'c']],
+    ['j48', 'Сопряжение С-48', 9624.0, 34203.5, 'junc', 0, [0, 14, 'c']],
+    ['osv2', 'Откаточный штрек Восточный (центр)', 9782.8, 34126.6, 'drift', 0, null],
+    ['j68', 'Сопряжение С-68', 9997.0, 33902.1, 'junc', 0, [10, 0, 'l']],
+    ['j70', 'Сопряжение С-70', 9975.5, 33851.8, 'junc', 0, [10, 0, 'l']],
+    ['j30', 'Сопряжение С-30', 9513.9, 33680.3, 'junc', 0, [0, 14, 'c']],
+    ['j31', 'Сопряжение С-31', 9470.9, 33682.4, 'junc', 0, [0, 14, 'c']],
+    ['otsw2', 'Откаточный штрек западный (восток)', 9405.5, 33695.8, 'drift', 0, null],
+    ['gk1c', 'Грузовой квершлаг 1 (нижний участок)', 8399.6, 33565.0, 'drift', 0, null],
+    ['otsw3', 'Откаточный штрек западный (запад)', 9015.7, 33832.9, 'drift', 0, null],
   ];
   const BASE = N.map(n => ({ id: n[0], name: n[1], x: n[2], y: n[3], kind: n[4], route: !!n[5], lab: n[6] }));
   const NODES = [], byId = {};
 
-  /* Трасса электровозов: от постов у карманов С-14, С-15 к КДРВ №2 (порядок узлов по плану, прямые отрезки между подписями) */
-  const BASE_ROUTE = ['c14', 'razd', 'otsw', 'z952', 'gk1', 'obg', 'gv2', 'ilnik', 'kdrv2'];
-  const ROUTE = [];
+  /* Маршруты составов по заданию от 25.11.2026 (чертёж от 26.09.2026). Цикл: порожний состав идёт от рудоспуска на погрузку в сопряжение С-20
+     (прямая погрузка с АТУ), гружёный возвращается к рудоспуску. Для КДРВ-2 общая часть та же; заезд через С-3 (50), выезд через С-1 (46) и С-2. */
+  const EMPTY_TAIL = ['ov', 'j8', 'obg', 'j7', 'gk1', 'j9', 'j53', 'gk1b', 'j10', 'ok1', 'j50', 'osv1', 'j47', 'j48', 'osv2', 'j68', 'j70', 'o20', 'j30', 'j31', 'otsw2', 's20'];
+  const LOADED_HEAD = ['s20', 's55', 'c1', 'otsw', 'otsw3', 'j52', 'j9', 'gk1', 'gk1c', 'j6', 'j5', 'j4', 'zop', 'kdrv2', 'j3b'];
+  const CYC = {
+    1: { name: 'КДРВ-1 (рудоспуск №1)', dump: 'rs1', loaded: LOADED_HEAD.concat(['kdrv1', 'j37', 'gvk1', 'rs1']), empty: ['rs1', 'pvk1', 'j3a', 'j2a'].concat(EMPTY_TAIL) },
+    2: { name: 'КДРВ-2 (рудоспуск №2)', dump: 'rs2', loaded: LOADED_HEAD.concat(['rs2']), empty: ['rs2', 'j1b', 'j2a'].concat(EMPTY_TAIL) },
+  };
+  /* Основная трасса схемы и анимации: КДРВ-2 (в расчёте разгрузка идёт на КДРВ №2) */
+  const BASE_ROUTE = CYC[2].loaded.slice();
+  const BASE_EMPTY = CYC[2].empty.slice();
+  const ROUTE = [], EMPTY = [];
   /* АТУ по меткам пикетов (ПК-0 … ПК-33 и заезд на п/э −402) */
   const ATU = [[9261, 33755], [9280, 33756], [9300, 33761], [9320, 33765], [9341, 33765], [9360, 33753], [9380, 33752], [9400, 33750], [9422, 33753], [9440, 33766], [9456, 33778], [9471, 33791], [9486, 33804], [9501, 33813], [9515, 33812], [9528, 33800], [9536, 33783], [9556, 33770], [9552, 33747], [9558, 33728], [9563, 33709], [9569, 33690], [9575, 33671], [9581, 33652], [9587, 33633], [9592, 33614], [9598, 33595], [9604, 33576], [9610, 33557], [9616, 33538], [9622, 33519], [9628, 33500], [9632, 33483], [9625, 33471], [9636, 33450]];
   /* Орты №28, №27, №26 (ось по меткам выносок, концы по плану): a — точка, u — направление, w и e — концы по оси, м */
@@ -98,18 +139,22 @@
 
   function dist(a, b) { return Math.hypot(a[0] - b[0], a[1] - b[1]); }
   /* Ломаная трассы и накопленная длина; RT меняется на месте, поэтому ссылки на него остаются верными */
-  const RT = { ids: [], pts: [], cum: [0], L: 0 };
+  const RT = { ids: [], pts: [], cum: [0], L: 0 }, RE = { ids: [], pts: [], cum: [0], L: 0 };
+  function fill(T, ids) {
+    T.ids = ids.slice(); T.pts = ids.map(id => [byId[id].x, byId[id].y]); T.cum = [0];
+    for (let i = 1; i < T.pts.length; i++) T.cum.push(T.cum[i - 1] + dist(T.pts[i - 1], T.pts[i]));
+    T.L = T.cum[T.cum.length - 1];
+  }
   function rebuild() {
-    RT.ids = ROUTE.slice(); RT.pts = ROUTE.map(id => [byId[id].x, byId[id].y]); RT.cum = [0];
-    for (let i = 1; i < RT.pts.length; i++) RT.cum.push(RT.cum[i - 1] + dist(RT.pts[i - 1], RT.pts[i]));
-    RT.L = RT.cum[RT.cum.length - 1];
-    NODES.forEach(n => { n.route = ROUTE.indexOf(n.id) >= 0; });
+    fill(RT, ROUTE); fill(RE, EMPTY);
+    NODES.forEach(n => { n.route = ROUTE.indexOf(n.id) >= 0; n.routeE = EMPTY.indexOf(n.id) >= 0; });
   }
   /* Правки пользователя: n — наименование и координаты узлов по id, c — добавленные узлы, r — порядок узлов трассы (null — по умолчанию) */
   const KEY = 'lg.plan.ov';
-  const emptyOv = () => ({ n: {}, c: [], r: null });
+  const emptyOv = () => ({ n: {}, c: [], r: null, v: 2 });
   const num = v => v != null && v !== '' && isFinite(v);
   function apply(ov) {
+    const cur = !!ov && ov.v === 2;
     ov = Object.assign(emptyOv(), ov || {});
     NODES.length = 0; Object.keys(byId).forEach(k => delete byId[k]);
     BASE.forEach(b => NODES.push(Object.assign({}, b, { lab: b.lab ? b.lab.slice() : null })));
@@ -119,21 +164,29 @@
       const e = (ov.n || {})[n.id];
       if (e) { if (e.name) n.name = String(e.name); if (num(e.x)) n.x = +e.x; if (num(e.y)) n.y = +e.y; n.edited = true; }
     });
-    const r = Array.isArray(ov.r) ? ov.r.filter(id => byId[id]) : null;
+    const r = cur && Array.isArray(ov.r) ? ov.r.filter(id => byId[id]) : null;   // порядок узлов старых версий (до 0.13) не применяется
     ROUTE.length = 0; (r && r.length >= 2 ? r : BASE_ROUTE).forEach(id => ROUTE.push(id));
+    EMPTY.length = 0; BASE_EMPTY.forEach(id => EMPTY.push(id));
     rebuild();
   }
-  function stored() { try { return JSON.parse(localStorage.getItem(KEY)); } catch (e) { return null; } }
+  function stored() {
+    try {
+      const o = JSON.parse(localStorage.getItem(KEY));
+      if (o && typeof o === 'object' && o.v !== 2) { o.r = null; o.v = 2; }
+      return o;
+    } catch (e) { return null; }
+  }
   function load() { apply(stored()); }
   apply(null);
 
   /* Точка трассы по доле пути f ∈ [0; 1] и направление хода (единичный вектор от поста к КДРВ) */
-  function at(f) {
+  function at(f, loaded) {
     f = Math.max(0, Math.min(1, f));
-    const s = f * RT.L;
+    const T = loaded === false ? RE : RT;           // порожний состав идёт по своей трассе, от разгрузки (f = 1) к погрузке (f = 0)
+    const s = (loaded === false ? 1 - f : f) * T.L;
     let i = 1;
-    while (i < RT.cum.length - 1 && RT.cum[i] < s) i++;
-    const a = RT.pts[i - 1], b = RT.pts[i], seg = RT.cum[i] - RT.cum[i - 1] || 1, k = (s - RT.cum[i - 1]) / seg;
+    while (i < T.cum.length - 1 && T.cum[i] < s) i++;
+    const a = T.pts[i - 1], b = T.pts[i], seg = T.cum[i] - T.cum[i - 1] || 1, k = (s - T.cum[i - 1]) / seg;
     return { x: a[0] + (b[0] - a[0]) * k, y: a[1] + (b[1] - a[1]) * k, ux: (b[0] - a[0]) / seg, uy: (b[1] - a[1]) / seg, seg: i - 1 };
   }
   /* Участки трассы: [{from, to, L_chord, L_model}] — длина по чертежу (хорда) и доля модельного пути L_путь */
@@ -146,10 +199,20 @@
     return out;
   }
 
+  /* Участки одного из маршрутов цикла: k — 1 (КДРВ-1) или 2 (КДРВ-2), dir — 'loaded' или 'empty'; kdev — коэффициент извилистости выработок */
+  function cycleLegs(k, dir, kdev) {
+    const ids = CYC[k][dir], out = []; let cum = 0;
+    for (let i = 1; i < ids.length; i++) {
+      const a = byId[ids[i - 1]], b = byId[ids[i]], L = dist([a.x, a.y], [b.x, b.y]);
+      cum += L; out.push({ from: a, to: b, L, Lk: L * (kdev || 1), cum, cumK: cum * (kdev || 1) });
+    }
+    return { legs: out, L: cum, Lk: cum * (kdev || 1) };
+  }
+
   /* Рисование на холсте. view: 'route' — трасса электровозов, 'all' — весь план. items: [{f, loaded, id, wait, slot}] */
   function bounds(view) {
-    const b = view === 'all' ? [7780, 33180, 10200, 33900] : [7800, 33230, 9560, 33900];
-    RT.pts.concat(NODES.filter(n => n.custom || n.edited).map(n => [n.x, n.y])).forEach(p => {
+    const b = view === 'all' ? [7780, 33180, 10200, 34400] : [7650, 33230, 10260, 34340];
+    RT.pts.concat(RE.pts, NODES.filter(n => n.custom || n.edited).map(n => [n.x, n.y])).forEach(p => {
       b[0] = Math.min(b[0], p[0] - 60); b[1] = Math.min(b[1], p[1] - 60); b[2] = Math.max(b[2], p[0] + 60); b[3] = Math.max(b[3], p[1] + 60);
     });
     return b;
@@ -166,7 +229,8 @@
     DRIFTS.forEach(d => poly(d.pts, line, 4));
     poly(ATU, '#b9a98a', 3);
     ORTS.forEach(r => poly(ortLine(r), '#9fb4a3', 3));
-    poly(RT.pts, '#98a6b3', 5);
+    poly(RE.pts, '#9db8d6', 5);
+    poly(RT.pts, '#d9b38a', 5);
     poly(RT.pts, css('--panel'), 1.5, [6, 6]);
     /* подписи фоновых линий */
     g.fillStyle = muted; g.font = '11px "Segoe UI", sans-serif'; g.textAlign = 'left';
@@ -180,8 +244,8 @@
       if (n.x < B[0] || n.x > B[2] || n.y < B[1] || n.y > B[3]) return;
       const lab = n.lab || (n.route || n.custom ? [10, -12, 'l'] : null);
       const labeled = !!lab && (view === 'all' ? (n.route || n.custom || ['p402', 'kdrv1', 'skip', 'vent'].includes(n.id)) : true);
-      const onR = n.route;
-      if (view === 'route' && !onR && !n.custom && !['c1', 'c15', 'c16', 's55', 's20', 'kdrv1', 'skip', 'vent'].includes(n.id)) return;
+      const onR = n.route || n.routeE;
+      if (view === 'route' && !onR && !n.custom && !['c15', 'c16', 'kdrv1', 'skip', 'vent'].includes(n.id)) return;
       g.fillStyle = onR ? acc : (n.kind === 'shaft' ? '#8c3a6a' : n.kind === 'pocket' ? '#7a4fa3' : muted);
       const r = n.kind === 'dump' ? 6 : onR ? 5 : 4;
       if (n.kind === 'dump' || n.kind === 'shaft') g.fillRect(X(n.x) - r, Y(n.y) - r, 2 * r, 2 * r);
@@ -195,7 +259,7 @@
     });
     /* составы */
     (o.items || []).forEach(it => {
-      const p = at(it.f), px = X(p.x), py = Y(p.y), ox2 = -p.uy * (it.slot || 0) * 12, oy2 = -p.ux * (it.slot || 0) * 12;
+      const p = at(it.f, it.loaded), px = X(p.x), py = Y(p.y), ox2 = -p.uy * (it.slot || 0) * 12, oy2 = -p.ux * (it.slot || 0) * 12;
       g.beginPath(); g.arc(px + ox2, py + oy2, 8, 0, 6.2832);
       g.fillStyle = it.off ? '#c9d1d9' : it.loaded ? '#d9822b' : '#3b82c4'; g.fill();
       g.lineWidth = it.wait ? 2.5 : 1; g.strokeStyle = it.wait ? '#b3261e' : 'rgba(0,0,0,.4)'; g.stroke();
@@ -206,5 +270,5 @@
   }
   const shorten = s => s.replace('Карман С-14 (порода)', 'Посты: карманы С-14, С-15, С-16').replace('Заезд на камеру опрокидывателя №2 (КДРВ №2)', 'КДРВ №2').replace('Заезд на камеру донной разгрузки вагонеток №1 (КДРВ №1)', 'КДРВ №1');
 
-  return { K, BASE, NODES, byId, ROUTE, RT, ATU, ORTS, DRIFTS, SECTIONS, at, legs, draw, ortLine, bounds, dist, apply, load, stored, emptyOv, KEY, BASE_ROUTE };
+  return { K, BASE, NODES, byId, ROUTE, EMPTY, CYC, RT, RE, cycleLegs, ATU, ORTS, DRIFTS, SECTIONS, at, legs, draw, ortLine, bounds, dist, apply, load, stored, emptyOv, KEY, BASE_ROUTE, BASE_EMPTY };
 }));

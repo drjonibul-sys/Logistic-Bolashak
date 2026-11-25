@@ -407,24 +407,46 @@ test('добыча: ЛНС, веер и проверка рисков', () => {
 
 test('схема −480: узлы, трасса и положение состава', () => {
   const PL = require(path.join(__dirname, '..', 'static', 'js', 'plan480.js'));
-  assert.equal(PL.ROUTE[PL.ROUTE.length - 1], 'kdrv2');
-  PL.ROUTE.forEach(id => assert.ok(PL.byId[id], id));
-  const a = PL.at(0), b = PL.at(1);
-  near(a.x, PL.byId.c14.x, 1e-9, 'старт'); near(b.x, PL.byId.kdrv2.x, 1e-9, 'финиш');
+  assert.equal(PL.ROUTE[0], 's20'); assert.equal(PL.ROUTE[PL.ROUTE.length - 1], 'rs2');
+  PL.ROUTE.concat(PL.EMPTY).forEach(id => assert.ok(PL.byId[id], id));
+  const a = PL.at(0, true), b = PL.at(1, true);
+  near(a.x, PL.byId.s20.x, 1e-9, 'старт'); near(b.x, PL.byId.rs2.x, 1e-9, 'финиш');
+  near(PL.at(0, false).x, PL.byId.s20.x, 1e-9, 'порожний: конец у погрузки'); near(PL.at(1, false).x, PL.byId.rs2.x, 1e-9, 'порожний: начало у рудоспуска');
   near(PL.legs(2400).reduce((s, l) => s + l.Lm, 0), 2400, 1e-6, 'модельная длина участков');
-  const mid = PL.at(0.5); assert.ok(mid.x > 8156 && mid.x < 9386);
+  const mid = PL.at(0.5, true); assert.ok(mid.x > 8000 && mid.x < 10000);
 });
 
 test('схема −480: правка узлов и порядка трассы', () => {
   const PL = require(path.join(__dirname, '..', 'static', 'js', 'plan480.js'));
   const L0 = PL.RT.L;
-  PL.apply({ n: { c14: { x: 9400 } }, c: [{ id: 'u1', name: 'Разъезд', x: 9000, y: 33800 }], r: ['c14', 'u1', 'kdrv2'] });
-  assert.deepEqual(PL.ROUTE, ['c14', 'u1', 'kdrv2']);
-  assert.equal(PL.byId.c14.x, 9400);
+  PL.apply({ n: { s20: { x: 9400 } }, c: [{ id: 'u1', name: 'Разъезд', x: 9000, y: 33800 }], r: ['s20', 'u1', 'kdrv2'], v: 2 });
+  assert.deepEqual(PL.ROUTE, ['s20', 'u1', 'kdrv2']);
+  assert.equal(PL.byId.s20.x, 9400);
   assert.ok(PL.byId.u1.route && PL.byId.u1.custom);
-  near(PL.at(1).x, PL.byId.kdrv2.x, 1e-9, 'финиш');
+  near(PL.at(1, true).x, PL.byId.kdrv2.x, 1e-9, 'финиш');
+  PL.apply({ r: ['s20', 'u1', 'kdrv2'] });                       // порядок без метки версии (до 0.13) не применяется
+  assert.equal(PL.ROUTE[PL.ROUTE.length - 1], 'rs2');
   PL.apply(null);
   near(PL.RT.L, L0, 1e-9, 'возврат к плану');
+});
+
+test('маршруты составов от 25.11.2026: порядок узлов КДРВ-1 и КДРВ-2', () => {
+  const PL = require(path.join(__dirname, '..', 'static', 'js', 'plan480.js'));
+  PL.apply(null);
+  const nm = id => PL.byId[id].name;
+  const e1 = PL.CYC[1].empty.map(nm), l1 = PL.CYC[1].loaded.map(nm), e2 = PL.CYC[2].empty.map(nm), l2 = PL.CYC[2].loaded.map(nm);
+  assert.equal(e1[0], 'Рудоспуск №1 (КДРВ-1, разгрузка)');
+  ['Сопряжение С-3 (порожняковая ветвь КДРВ-1)', 'Сопряжение С-2', 'Сопряжение С-8 (48)', 'Сопряжение С-7 (47)', 'Сопряжение С-9 (59)', 'Сопряжение С-53 (47)', 'Сопряжение С-10 (45)', 'Сопряжение С-50', 'Сопряжение С-47', 'Сопряжение С-48', 'Сопряжение С-68', 'Сопряжение С-70', 'Сопряжение С-30', 'Сопряжение С-31']
+    .forEach((x, i, a) => { assert.ok(e1.indexOf(x) > (i ? e1.indexOf(a[i - 1]) : -1), 'порядок порожнего: ' + x); });
+  assert.equal(e1[e1.length - 1], nm('s20')); assert.equal(e2[e2.length - 1], nm('s20'));
+  ['Сопряжение С-55 (62)', 'Карман С-1 (камера −460, −480)', 'Сопряжение С-52 (44)', 'Сопряжение С-9 (59)', 'Сопряжение С-6 (58)', 'Сопряжение С-5 (46)', 'Сопряжение С-4 (50)', 'Заезд на опрокиды', 'Сопряжение С-3 (50)']
+    .forEach((x, i, a) => { assert.ok(l1.indexOf(x) > (i ? l1.indexOf(a[i - 1]) : 0), 'порядок гружёного: ' + x); });
+  assert.deepEqual(l1.slice(-4), ['Заезд на камеру донной разгрузки вагонеток №1 (КДРВ №1)', 'Сопряжение С-37', 'Грузовая ветвь КДРВ №1', 'Рудоспуск №1 (КДРВ-1, разгрузка)']);
+  assert.deepEqual(l2.slice(-2), ['Сопряжение С-3 (50)', 'Рудоспуск №2 (КДРВ-2, разгрузка)']);
+  assert.deepEqual(e2.slice(0, 4), ['Рудоспуск №2 (КДРВ-2, разгрузка)', 'Сопряжение С-1 (46)', 'Сопряжение С-2', nm('ov')]);
+  assert.equal(e2.indexOf('Сопряжение С-3 (порожняковая ветвь КДРВ-1)'), -1, 'КДРВ-2 не заезжает в С-3 порожняковой ветви');
+  const c = PL.cycleLegs(1, 'empty', 1.3);
+  near(c.Lk, c.L * 1.3, 1e-9); assert.ok(c.L > 2000 && c.L < 6000, 'длина порожнего пути ' + c.L);
 });
 
 test('суточное планирование: плечо по маршруту и итоги', () => {

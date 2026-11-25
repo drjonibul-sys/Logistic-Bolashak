@@ -217,6 +217,8 @@ try:
         go('/nodes.html')
         pg.wait_for_selector('#ndOut table')
         check('узлы: наименования с чертежа', all(x in pg.inner_text('#ndOut') for x in ('КДРВ №2', 'Ствол «Скиповой»', 'Карман С-16', 'Грузовой квершлаг 1', 'Заезд 9/52')))
+        txt = pg.inner_text('#ndOut')
+        check('узлы: маршруты порожних и гружёных составов КДРВ-1 и КДРВ-2', all(x in txt for x in ('Порожний состав: КДРВ-1', 'Гружёный состав: КДРВ-1', 'Порожний состав: КДРВ-2', 'Гружёный состав: КДРВ-2', 'Сопряжение С-47', 'Сопряжение С-70', 'Сопряжение С-37', 'Сопряжение С-1 (46)')))
         pg.select_option('#ndView', 'all')
         pg.select_option('#ndView', 'route')
         n0 = pg.locator('#routeEdit tbody tr').count()

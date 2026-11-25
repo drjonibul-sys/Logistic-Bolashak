@@ -43,12 +43,14 @@
     const b = BL && BL.blocks ? BL.blocks.find(x => x.id === 'atu') : null;
     return b ? b.segments.map(s => ({ name: s.name, L: s.L, how: 'самосвал' })) : [{ name: 'АТУ: заезд на п/э −402 → карман С-1', L: 711, how: 'самосвал' }];
   }
-  /* Электровозы от постов (карман С-14) до пункта разгрузки по трассе: сумма участков × k_изв; КДРВ №1 и ствол — продолжение хордой от КДРВ №2 */
+  /* Электровозы от погрузки (сопряжение С-20) до пункта разгрузки по гружёному маршруту: сумма участков × k_изв.
+     КДРВ №1 идёт по своему маршруту (через С-37 и грузовую ветвь), КДРВ №2 — по основной трассе; ствол — продолжение хордой от КДРВ №2 */
   function wagonStages(to, k) {
-    const out = [], last = PLAN.ROUTE[PLAN.ROUTE.length - 1], legs = PLAN.legs(0);
-    const Ls = legs.reduce((s, l) => s + l.L, 0) * k;
-    out.push({ name: 'Электровозы: ' + PLAN.byId[PLAN.ROUTE[0]].name + ' → ' + PLAN.byId[last].name + ' (' + legs.length + ' уч., хорды × k_изв ' + k + ')', L: Ls, how: 'электровоз' });
-    if (to !== 'kdrv2') out.push({ name: 'От «' + PLAN.byId[last].name + '» до «' + PLAN.byId[to].name + '» (хорда × k_изв)', L: chord(last, to) * k, how: 'электровоз' });
+    const ids = to === 'kdrv1' ? PLAN.CYC[1].loaded : PLAN.ROUTE, last = ids[ids.length - 1];
+    let L = 0;
+    for (let i = 1; i < ids.length; i++) L += chord(ids[i - 1], ids[i]);
+    const out = [{ name: 'Электровозы: ' + PLAN.byId[ids[0]].name + ' → ' + PLAN.byId[last].name + ' (' + (ids.length - 1) + ' уч., хорды × k_изв ' + k + ')', L: L * k, how: 'электровоз' }];
+    if (to !== 'kdrv2' && to !== 'kdrv1') out.push({ name: 'От «' + PLAN.byId[last].name + '» до «' + PLAN.byId[to].name + '» (хорда × k_изв)', L: chord(last, to) * k, how: 'электровоз' });
     return out;
   }
 
