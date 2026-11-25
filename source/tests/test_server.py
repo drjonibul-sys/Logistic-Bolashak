@@ -244,7 +244,7 @@ class TestServer(ServerCase):
         self.assertEqual(c.call("PUT", "/api/blocks", bad)[0], 422)
         self.assertEqual(c.call("PUT", "/api/blocks", {"blocks": blocks["blocks"][:2]})[0], 422)
         self.assertEqual(c.call("POST", "/api/blocks/reset", {})[0], 200)
-        self.assertEqual(c.call("GET", "/api/reference")[1]["values"]["L_path"], 2400)
+        self.assertEqual(c.call("GET", "/api/reference")[1]["values"]["L_path"], 3133)
 
     def test_06_change_password(self):
         c = Client()
@@ -309,7 +309,8 @@ class TestResultSharing(ServerCase):
         c = Client()
         st, js, _, _ = c.call("GET", "/api/scheme")
         self.assertEqual(st, 200)
-        self.assertEqual(js["capacity"]["bottleneck"], "loader")
+        # при L_путь 3133 м (маршруты 25.11.2026) узкое место — электровозы, а не ПДМ
+        self.assertEqual(js["capacity"]["bottleneck"], "locos")
         self.assertEqual(len(js["geometry"]["nodes"]), js["geometry"]["n_blocks"] + 1)
         self.assertAlmostEqual(js["times"]["t_eff_shift"], 26496.0, 3)
 

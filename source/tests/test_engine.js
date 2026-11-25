@@ -117,7 +117,7 @@ test('блоки: справочник и расчёт ПДМ и самосва�
   const long = B.defaults(); long.blocks[1].segments[0].L = 1040;
   assert.ok(B.calcTrucks(D, long).rate < t.rate);
   // сумма плеч −480
-  assert.equal(B.totalLength(bl, 'm480'), 2400);
+  assert.equal(B.totalLength(bl, 'm480'), 3133);
   const r = B.calcBlocks(D, bl, LG.scheme(D));
   assert.equal(r.blocks.length, 3);
   assert.ok(r.blocks.every(b => b.rate > 0));
