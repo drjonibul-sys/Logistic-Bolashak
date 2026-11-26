@@ -28,11 +28,12 @@ function drawCharts() {
   drawGantt($('#cvGantt'), R);
   const r = R.resources;
   const rows = [];
-  R.locos.forEach(l => rows.push({ label: 'Электровоз ' + l.id, value: l.util, color: '#3b82c4' }));
+  R.locos.forEach(l => rows.push({ label: 'Электровоз ' + l.id + (R.kpi.systems.length > 1 || l.system === '—' ? ' · ' + (l.system === '—' ? l.role : l.system) : ''), value: l.util, color: l.system === 'GSC' ? '#2e9e6b' : '#3b82c4' }));
   r.blocks.forEach((x, i) => rows.push({ label: 'Блок-участок ' + (i + 1), value: x, color: '#98a6b3' }));
-  r.posts.forEach((x, i) => rows.push({ label: 'Пост ' + postName(i, R.params.n_posts), value: x, color: '#8e7cc3' }));
+  r.posts.forEach((x, i) => rows.push({ label: (/^Орт/.test(postLabel(R, i)) ? '' : 'Пост ') + postLabel(R, i), value: x, color: '#8e7cc3' }));
   rows.push({ label: 'ПДМ ST1030 №2', value: r.loader, color: '#6a4fb3' });
   rows.push({ label: 'КДРВ №2', value: r.kdrv, color: '#2e9e6b' });
+  if (R.derived.fleet && R.derived.fleet.gsc > 0 && R.params.kdrv_gsc === 1) rows.push({ label: 'КДРВ №1', value: r.kdrv_list[1], color: '#2e9e6b' });
   barChart($('#cvUtil'), rows, 1, '%');
   const wrows = R.waits.map(w => ({ label: w.state, value: w.total / 60, color: COLORS[w.state] }));
   barChart($('#cvWait'), wrows, Math.max(1, ...wrows.map(x => x.value)), 'мин');

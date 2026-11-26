@@ -9,8 +9,8 @@ const LG = require(path.join(__dirname, '..', 'static', 'js', 'engine.js'));
 const D = LG.defaults();
 const near = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg || ''} ${a} != ${b}`);
 
-test('справочник: 209 параметров, значения проходят проверку', () => {
-  assert.equal(Object.keys(D).length, 209);
+test('справочник: 221 параметр, значения проходят проверку', () => {
+  assert.equal(Object.keys(D).length, 221);
   const v = LG.validate(D);
   assert.deepEqual(v.errors, []);
   assert.deepEqual(v.clean, D);
@@ -550,4 +550,70 @@ test('прямая погрузка с АТУ: на посту один сост
   const two = LG.simulate(Object.assign({}, base, { n_posts: 2 }), 'shift');
   assert.ok(two.kpi.tonnes >= r.kpi.tonnes, 'два поста не дают меньше одного');
   assert.equal(LG.scheme(base).capacity.links.find(x => x.key === 'posts').name, 'Пост прямой погрузки с АТУ (С-20)');
+});
+
+/* ---------- две системы разработки: SLC (АТУ) и GSC (орты 26, 27, 28), версия 0.16.0 ---------- */
+const DUAL = Object.assign({}, D, { L_path: 3133, L_gruz: 2076.1, L_por: 4190.3, L_obsh: 756.2, x_obsh_g: 677.5, x_obsh_p: 2825.5, n_posts: 1,
+  plan_slc: 1200, plan_gsc: 1680, n_loco: 9, n_loco_gsc: 4, n_loco_rez: 1, n_loco_rem: 1,
+  L_gruz_gsc: 3242.3, L_por_gsc: 4174.7, x_obsh_g_gsc: 1727.8, x_obsh_p_gsc: 2753.1 });
+
+test('парк: SLC = всего − GSC − резерв − ремонт − порода, роли задаются вручную', () => {
+  assert.deepEqual(LG.K.fleet(DUAL), { gsc: 4, rez: 1, rem: 1, por: 0, slc: 3 });
+  assert.deepEqual(LG.K.fleet(Object.assign({}, DUAL, { n_loco_gsc: 20 })), { gsc: 9, rez: 0, rem: 0, por: 0, slc: 0 });
+  const r = LG.simulate(DUAL, 'shift');
+  assert.deepEqual(r.locos.map(l => l.system), ['SLC', 'SLC', 'SLC', 'GSC', 'GSC', 'GSC', 'GSC', '—', '—']);
+  assert.deepEqual(r.locos.slice(7).map(l => l.role), ['резерв', 'ремонт']);
+  r.locos.slice(7).forEach(l => { assert.equal(l.trips, 0); assert.equal(l.util, 0); });
+});
+
+test('две системы: планы суммируются, факт по системам складывается в общий', () => {
+  const r = LG.simulate(DUAL, 'shift');
+  assert.equal(r.derived.plan_total, 2880);
+  assert.equal(r.derived.plan_slc, 1200);
+  assert.equal(r.derived.plan_gsc, 1680);
+  const s = r.kpi.systems;
+  assert.equal(s.length, 2);
+  near(s[0].tonnes + s[1].tonnes, r.kpi.tonnes, 1e-9, 'сумма по системам');
+  near(s[0].plan + s[1].plan, r.derived.plan_total, 1e-9, 'сумма планов');
+  assert.equal(s[0].trains + s[1].trains, r.kpi.trains);
+  assert.equal(r.checks.deadlock, false);
+  near(r.checks.balance_diff, 0, 1e-6, 'баланс');
+  assert.equal(r.resources.posts.length, 4, 'один пост SLC и три орта GSC');
+  assert.deepEqual(r.route.post_names, ['С-20 (АТУ)', 'Орт №26', 'Орт №27', 'Орт №28']);
+  // за сутки планы удваиваются
+  assert.equal(LG.simulate(DUAL, 'day').derived.plan_total, 5760);
+});
+
+test('GSC: три независимых поста, погрузка состава = t_пос + n · t_в без ПДМ', () => {
+  const p = Object.assign({}, DUAL, { n_loco_gsc: 1, n_loco: 1, n_loco_rez: 0, n_loco_rem: 0 });
+  // один электровоз GSC: SLC нет
+  const r = LG.simulate(p, 'shift');
+  assert.equal(r.kpi.systems[0].trains, 0);
+  assert.ok(r.kpi.systems[1].trains > 0);
+  const tLoad = D.s_t_spot * 60 + D.n_wagons * D.s_t_wag * 60;
+  near(r.derived.t_load_train_gsc, tLoad, 1e-9, 't погр.сост GSC');
+  near(r.kpi.cycle_mean, r.derived.cycle_analytic_gsc, 1e-6, 'цикл одного электровоза GSC = аналитический');
+  assert.equal(r.resources.loader, 0, 'ПДМ в GSC не участвует');
+  // посты ортов независимы: три электровоза GSC грузятся одновременно, не мешая друг другу
+  const r3 = LG.simulate(Object.assign({}, p, { n_loco: 3, n_loco_gsc: 3 }), 'shift');
+  assert.ok(r3.kpi.systems[1].trains >= 2.5 * r.kpi.systems[1].trains * 0.9, 'выпуск растёт почти втрое');
+});
+
+test('GSC: максимум по техническим параметрам суммируется с SLC', () => {
+  const sc = LG.scheme(DUAL);
+  assert.equal(sc.capacity.systems.length, 2);
+  near(sc.capacity.tonnes_ref, sc.capacity.systems[0].tonnes_ref + sc.capacity.systems[1].tonnes_ref, 1e-9, 'сумма максимумов');
+  assert.equal(sc.capacity.plan_shift, 2880);
+  const mp = LG.simulate(DUAL, 'shift').max_perf;
+  near(mp.tonnes_max, sc.capacity.tonnes_ref, 1e-9, 'максимум шахты');
+  assert.equal(mp.systems.length, 2);
+  // без GSC максимум и ориентир прежние
+  assert.equal(LG.scheme(Object.assign({}, DUAL, { n_loco_gsc: 0 })).capacity.systems.length, 1);
+});
+
+test('прежний режим: без ролей и планов систем результат не меняется', () => {
+  const r = LG.simulate(D, 'shift');
+  assert.equal(r.kpi.systems.length, 1);
+  assert.equal(r.derived.plan_total, D.plan_shift);
+  assert.ok(r.locos.every(l => l.role === 'SLC'));
 });

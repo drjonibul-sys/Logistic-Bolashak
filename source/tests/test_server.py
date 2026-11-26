@@ -296,6 +296,8 @@ class TestResultSharing(ServerCase):
         a = admin_client()
         vals = dict(a.call("GET", "/api/reference")[1]["values"])
         vals["n_loco"] = 4
+        vals["n_loco_gsc"] = 1   # парк 4: SLC 3 + GSC 1 (без резерва)
+        vals["n_loco_rez"] = 0
         self.assertEqual(a.call("PUT", "/api/reference", {"values": vals})[0], 200)
         self.assertTrue(c.call("GET", "/api/last")[1]["stale"])
         # новый расчёт снимает пометку

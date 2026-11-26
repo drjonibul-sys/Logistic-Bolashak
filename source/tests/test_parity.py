@@ -63,6 +63,17 @@ def make_jobs():
              ("direct-atu-day", dict(lan, n_posts=1, n_loco=5), "day"),
              ("two-buckets-per-wagon", dict(lan, n_kov=2, n_loco=7), "shift"),
              ("direct-atu-two-buckets", dict(lan, n_posts=1, n_kov=2, n_loader=2, n_loco=6), "shift")]
+    # две системы разработки: SLC (АТУ) + GSC (орты 26, 27, 28), роли электровозов задаются вручную
+    dual = dict(lan, n_posts=1, plan_slc=1200.0, plan_gsc=1680.0)
+    jobs += [("dual-default", dict(dual, n_loco=9, n_loco_gsc=4, n_loco_rez=1, n_loco_rem=1), "shift"),
+             ("dual-day", dict(dual, n_loco=9, n_loco_gsc=4, n_loco_por=2), "day"),
+             ("dual-own-kdrv2", dict(dual, n_loco=8, n_loco_gsc=3, kdrv_gsc=2), "shift"),
+             ("dual-gsc-lanes", dict(dual, n_loco=9, n_loco_gsc=4, L_gruz_gsc=2400.0, L_por_gsc=3600.0, x_obsh_g_gsc=500.0, x_obsh_p_gsc=1800.0), "shift"),
+             ("dual-legacy-lanes", dict(d, n_loco=7, n_loco_gsc=3, plan_slc=1200.0, plan_gsc=1680.0), "shift"),
+             ("dual-one-post-gsc", dict(dual, n_loco=9, n_loco_gsc=4, n_posts_gsc=1), "shift"),
+             ("dual-slow", dict(dual, n_loco=10, n_loco_gsc=5, k_v=0.4, n_posts_gsc=4), "shift"),
+             ("roles-only-idle", dict(lan, n_loco=5, n_loco_rez=2, n_loco_rem=1), "shift"),
+             ("roles-all-gsc", dict(dual, n_loco=4, n_loco_gsc=4), "shift")]
     rnd = random.Random(20261024)
     meta = PR.meta()
     for i in range(40):

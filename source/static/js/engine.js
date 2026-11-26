@@ -71,6 +71,34 @@
       const ln = K.lanes(p);
       return K.loadingTrainTime(p) + p.t_unload + (ln[0] + ln[1]) / v + 2 * K.stopLoss(v, p.a, p.b);
     },
+    /* распределение электровозов по ролям: GSC, резерв, ремонт, уборка породы; остальные — SLC */
+    fleet(p) {
+      let left = Math.trunc(p.n_loco);
+      const out = {};
+      [['gsc', 'n_loco_gsc'], ['rez', 'n_loco_rez'], ['rem', 'n_loco_rem'], ['por', 'n_loco_por']].forEach(kv => {
+        const c = Math.max(0, Math.min(Math.trunc(p[kv[1]] || 0), left));
+        out[kv[0]] = c; left -= c;
+      });
+      out.slc = left;
+      return out;
+    },
+    /* план в смену по системам: [SLC, GSC, всего] */
+    plans(p) {
+      const a = p.plan_slc || 0, b = p.plan_gsc || 0;
+      return a + b > 0 ? [a, b, a + b] : [p.plan_shift, 0, p.plan_shift];
+    },
+    gscSpotTime: p => p.s_t_spot * 60,
+    gscLoadTime: p => p.n_wagons * p.s_t_wag * 60,
+    lanesGsc(p) {
+      const l0 = K.lanes(p);
+      const lg = p.L_gruz_gsc > 0 ? p.L_gruz_gsc : l0[0], le = p.L_por_gsc > 0 ? p.L_por_gsc : l0[1];
+      return [lg, le, l0[2] > 0 ? Math.min(l0[2], lg, le) : 0];
+    },
+    cycleAnalyticGsc(p) {
+      const v = K.speedMs(p.v_kmh, p.k_v);
+      const ln = K.lanesGsc(p);
+      return K.gscSpotTime(p) + K.gscLoadTime(p) + p.t_unload + (ln[0] + ln[1]) / v + 2 * K.stopLoss(v, p.a, p.b);
+    },
   };
 
   /* ---------- движок (sim/engine.py) ---------- */
@@ -80,7 +108,8 @@
   const WAIT = ['ожидание поста', 'ожидание ПДМ', 'ожидание КДРВ',
     'ожидание блок-участка', 'ожидание в выработке', 'стоянка на разминовке'];
   const OFF = ['вне работы'];
-  const STATE_NAMES = MOVE.concat(LOAD, UNL, WAIT, OFF);
+  const IDLE = ['резерв', 'ремонт', 'уборка породы'];   // электровозы вне рудной откатки (атрибут задаётся вручную)
+  const STATE_NAMES = MOVE.concat(LOAD, UNL, WAIT, OFF, IDLE);
   const STATE_IDX = {};
   STATE_NAMES.forEach((s, i) => { STATE_IDX[s] = i; });
 
@@ -168,10 +197,17 @@
 
   class Loco {
     constructor(i) {
-      this.id = i; this.node = 0; this.dir = -1; this.loaded = false; this.cargo = 0; this.pending = 0;
+      this.id = i; this.sys = 0; this.role = 'SLC'; this.idle = false; this.node = 0; this.dir = -1; this.loaded = false; this.cargo = 0; this.pending = 0;
       this.holding = null; this.parkedAt = null; this.post = null; this.wagon = 0;
-      this.state = null; this.stateT = 0; this.x0 = 0; this.destX = 0; this.arrT = 0; this.loadT0 = 0; this.post0 = -1;
+      this.state = null; this.stateT = 0; this.x0 = 0; this.destX = 0; this.arrT = 0; this.loadT0 = 0; this.post0 = -1; this.lastPost = -1; this.lp0 = -1;
       this.states = []; this.marks = []; this.trips = 0; this.tonnes = 0;
+    }
+  }
+
+  class Sys {
+    constructor(idx, name, laneG, laneE, p0, p1, tSpot) {
+      this.idx = idx; this.name = name; this.laneG = laneG; this.laneE = laneE;
+      this.p0 = p0; this.p1 = p1; this.tSpot = tSpot; this.postQ = []; this.kd = 0;
     }
   }
 
@@ -185,34 +221,66 @@
       const ln = K.lanes(P), Lg = ln[0], Le = ln[1], S = ln[2];
       const pg = splitLane(Lg, P.x_obsh_g, S, this.nb), pe = splitLane(Le, P.x_obsh_p, S, this.nb);
       this.sharedMode = S > 0;
+      const fl = K.fleet(P);
+      this.fleet = fl;
+      const dual = fl.gsc > 0;
       this.Lp = K.trainLength(P.L_loco, Math.trunc(P.n_wagons), P.L_wag);
       this.capLoop = K.loopCapacity(P.L_razm, this.Lp, P.L_zap);
       this.lossA = K.accelLoss(this.v, P.a);
       this.lossB = K.brakeLoss(this.v, P.b);
+      const specs = [[Lg, Le, pg, pe]];
+      if (dual) {
+        const l2 = K.lanesGsc(P);
+        const xg2 = P.x_obsh_g_gsc > 0 ? P.x_obsh_g_gsc : (P.x_obsh_g || 0);
+        const xe2 = P.x_obsh_p_gsc > 0 ? P.x_obsh_p_gsc : (P.x_obsh_p || 0);
+        specs.push([l2[0], l2[1], splitLane(l2[0], xg2, l2[2], this.nb), splitLane(l2[1], xe2, l2[2], this.nb)]);
+      }
+      const lanes = [];
       if (this.sharedMode) {
         const sh = new Block();
-        this.laneG = new Lane(Lg, P.L_path, pg, sh);
-        this.laneE = new Lane(Le, P.L_path, pe, sh);
-        this.blocks = this.laneG.blocks.concat(this.laneE.blocks.filter(x => x !== sh));
+        this.blocks = [];
+        specs.forEach(sp => {
+          const g = new Lane(sp[0], P.L_path, sp[2], sh), e = new Lane(sp[1], P.L_path, sp[3], sh);
+          lanes.push([g, e]);
+          [g, e].forEach(L => L.blocks.forEach(b => { if (this.blocks.indexOf(b) < 0) this.blocks.push(b); }));
+        });
       } else {
         this.blocks = [];
         for (let i = 0; i < this.nb; i++) this.blocks.push(new Block());
-        this.laneG = new Lane(Lg, P.L_path, pg, null, this.blocks);
-        this.laneE = new Lane(Le, P.L_path, pe, null, this.blocks);
-        this.laneE.parked = this.laneG.parked;
+        const parked = new Array(this.nb + 1).fill(0);
+        specs.forEach(sp => {
+          const g = new Lane(sp[0], P.L_path, sp[2], null, this.blocks), e = new Lane(sp[1], P.L_path, sp[3], null, this.blocks);
+          g.parked = parked; e.parked = parked;
+          lanes.push([g, e]);
+        });
       }
+      this.laneG = lanes[0][0]; this.laneE = lanes[0][1];
       const nPosts = Math.trunc(P.n_posts);
-      this.posts = new Array(nPosts).fill(null);
-      this.postStart = new Array(nPosts).fill(0);
-      this.postBusy = new Array(nPosts).fill(0);
-      this.postQ = [];
+      const nPostsG = dual ? Math.trunc(P.n_posts_gsc) : 0;
+      this.sys = [new Sys(0, 'SLC', lanes[0][0], lanes[0][1], 0, nPosts, P.t_post)];
+      if (dual) this.sys.push(new Sys(1, 'GSC', lanes[1][0], lanes[1][1], nPosts, nPosts + nPostsG, K.gscSpotTime(P)));
+      const totalPosts = nPosts + nPostsG;
+      this.posts = new Array(totalPosts).fill(null);
+      this.postStart = new Array(totalPosts).fill(0);
+      this.postBusy = new Array(totalPosts).fill(0);
+      this.postNames = (nPosts === 1 ? ['С-20 (АТУ)'] : Array.from({ length: nPosts }, (_, i) => i < 2 ? ['С-14', 'С-15'][i] : 'Пост ' + (i + 1)))
+        .concat(Array.from({ length: nPostsG }, (_, i) => nPostsG === 3 ? 'Орт №' + (26 + i) : 'Пост GSC ' + (i + 1)));
+      this.sysUnloaded = [0, 0];
+      this.sys[0].kd = 0;
+      if (dual) this.sys[1].kd = Math.trunc(P.kdrv_gsc) === 1 ? 1 : 0;
       this.loaderCnt = 0; this.loaderQ = []; this.loaderBusy = 0;
-      this.kdrv = null; this.kdrvQ = []; this.kdrvStart = 0; this.kdrvBusy = 0;
+      this.kdrv = [null, null]; this.kdrvQ = [[], []]; this.kdrvStart = [0, 0]; this.kdrvBusy = [0, 0];
       this.loadedTotal = 0; this.unloadedTotal = 0; this.unloadEvents = [];
       this.qPost = [[0, 0]]; this.qKdrv = [[0, 0]]; this.qLoader = [[0, 0]];
       this.deadlock = false;
       this.locos = [];
       for (let i = 0; i < Math.trunc(P.n_loco); i++) this.locos.push(new Loco(i));
+      const roles = [];
+      [['SLC', fl.slc], ['GSC', fl.gsc], ['резерв', fl.rez], ['ремонт', fl.rem], ['уборка породы', fl.por]]
+        .forEach(r => { for (let i = 0; i < r[1]; i++) roles.push(r[0]); });
+      this.locos.forEach((l, i) => {
+        l.role = roles[i]; l.sys = l.role === 'GSC' ? 1 : 0; l.idle = l.role !== 'SLC' && l.role !== 'GSC';
+      });
     }
 
     /* ---------- вспомогательное ---------- */
@@ -233,19 +301,20 @@
     }
     logq() {
       const t = this.t;
-      this.qPost.push([t, this.postQ.length]);
-      this.qKdrv.push([t, this.kdrvQ.length]);
+      this.qPost.push([t, this.sys.reduce((a, x) => a + x.postQ.length, 0)]);
+      this.qKdrv.push([t, this.kdrvQ[0].length + this.kdrvQ[1].length]);
       this.qLoader.push([t, this.loaderQ.length]);
     }
-    lane(l) { return l.dir === 1 ? this.laneG : this.laneE; }
+    lane(l) { const s = this.sys[l.sys]; return l.dir === 1 ? s.laneG : s.laneE; }
     posX(l) { return this.lane(l).eq[l.node]; }
     setState(l, s) {
       const t = this.t;
       if (l.state !== null && t > l.stateT) {
-        l.states.push([l.stateT, t, l.state, l.x0, this.posX(l), l.loaded, l.post0]);
+        l.states.push([l.stateT, t, l.state, l.x0, this.posX(l), l.loaded, l.post0, l.lp0]);
       }
       l.state = s; l.stateT = t; l.x0 = this.posX(l);
       l.post0 = l.post !== null ? l.post : -1;
+      l.lp0 = l.lastPost;
     }
 
     /* ---------- цикл локомотива ---------- */
@@ -258,8 +327,9 @@
         return;
       }
       this.setState(l, 'ожидание поста');
-      this.postQ.push(l);
-      this.assignPosts();
+      const s = this.sys[l.sys];
+      s.postQ.push(l);
+      this.assignPosts(s);
       this.logq();
     }
     sendOff(l) {
@@ -268,23 +338,28 @@
       if (ns !== null) this.at(ns, this.wantPost, [l]);
     }
     windowEnd() {
-      const q = this.postQ; this.postQ = [];
-      q.forEach(l => this.sendOff(l));
+      this.sys.forEach(s => { const q = s.postQ; s.postQ = []; q.forEach(l => this.sendOff(l)); });
       this.logq();
     }
-    assignPosts() {
-      while (this.postQ.length) {
-        const free = this.posts.indexOf(null);
+    assignPosts(s) {
+      while (s.postQ.length) {
+        let free = -1;
+        for (let i = s.p0; i < s.p1; i++) if (this.posts[i] === null) { free = i; break; }
         if (free < 0) break;
-        const l = this.postQ.shift();
+        const l = s.postQ.shift();
         if (!this.inWindow(this.t)) { this.sendOff(l); continue; }
         this.posts[free] = l;
         this.postStart[free] = this.t;
-        l.post = free; l.wagon = 0;
+        l.post = free; l.lastPost = free - s.p0; l.wagon = 0;
         this.setState(l, 'постановка под погрузку');
-        this.at(this.t + this.P.t_post, this.spotWagon, [l]);
+        this.at(this.t + s.tSpot, s.idx === 0 ? this.spotWagon : this.gscLoad, [l]);
       }
       this.logq();
+    }
+    /* GSC: состав стоит у люка орта, вагоны грузятся скреперной лебёдкой последовательно, ПДМ не нужна */
+    gscLoad(l) {
+      this.setState(l, 'погрузка');
+      this.at(this.t + K.gscLoadTime(this.P), this.finishLoading, [l]);
     }
     spotWagon(l) {
       this.setState(l, 'подача вагона');
@@ -321,7 +396,7 @@
       this.postBusy[i] += this.overlap(this.postStart[i], this.t);
       this.posts[i] = null;
       l.post = null;
-      this.assignPosts();
+      this.assignPosts(this.sys[l.sys]);
       l.dir = 1;
       l.pending = this.lossA;
       this.requestBlock(l, 0, 0);
@@ -401,15 +476,16 @@
     /* ---------- КДРВ ---------- */
     wantKdrv(l) {
       this.setState(l, 'ожидание КДРВ');
-      this.kdrvQ.push(l);
-      this.grantKdrv();
+      const k = this.sys[l.sys].kd;
+      this.kdrvQ[k].push(l);
+      this.grantKdrv(k);
       this.logq();
     }
-    grantKdrv() {
-      if (this.kdrv === null && this.kdrvQ.length) {
-        const l = this.kdrvQ.shift();
-        this.kdrv = l;
-        this.kdrvStart = this.t;
+    grantKdrv(k) {
+      if (this.kdrv[k] === null && this.kdrvQ[k].length) {
+        const l = this.kdrvQ[k].shift();
+        this.kdrv[k] = l;
+        this.kdrvStart[k] = this.t;
         this.setState(l, 'разгрузка');
         this.at(this.t + this.P.t_unload, this.endUnload, [l]);
         this.logq();
@@ -417,25 +493,27 @@
     }
     endUnload(l) {
       const t = this.t;
-      this.kdrvBusy += this.overlap(this.kdrvStart, t);
-      this.kdrv = null;
+      const sy = this.sys[l.sys], k = sy.kd;
+      this.kdrvBusy[k] += this.overlap(this.kdrvStart[k], t);
+      this.kdrv[k] = null;
       this.unloadedTotal += l.cargo;
+      this.sysUnloaded[l.sys] += l.cargo;
       l.tonnes += l.cargo;
       l.cargo = 0;
       l.loaded = false;
       l.trips += 1;
       l.marks.push(t);
       this.unloadEvents.push([t, this.unloadedTotal]);
-      this.grantKdrv();
+      this.grantKdrv(k);
       l.dir = -1;
-      l.node = this.laneE.m;
+      l.node = sy.laneE.m;
       l.pending = this.lossA;
-      this.requestBlock(l, this.laneE.m - 1, this.laneE.m);
+      this.requestBlock(l, sy.laneE.m - 1, sy.laneE.m);
     }
 
     /* ---------- прогон ---------- */
     run() {
-      this.locos.forEach(l => this.at(0, this.wantPost, [l]));
+      this.locos.forEach(l => { if (l.idle) this.setState(l, l.role); else this.at(0, this.wantPost, [l]); });
       this.windows.forEach(w => this.at(w[1], this.windowEnd, []));
       let drained = true;
       while (this.q.length) {
@@ -452,12 +530,12 @@
           const frac = Math.min(1, (this.horizon - l.stateT) / (l.arrT - l.stateT));
           x1 = l.x0 + (l.destX - l.x0) * frac;
         }
-        if (this.horizon > l.stateT) l.states.push([l.stateT, this.horizon, l.state, l.x0, x1, l.loaded, l.post0]);
+        if (this.horizon > l.stateT) l.states.push([l.stateT, this.horizon, l.state, l.x0, x1, l.loaded, l.post0, l.lp0]);
       });
       this.blocks.forEach(B => { if (B.holder !== null) B.busy += this.overlap(B.occStart, this.horizon); });
       this.posts.forEach((h, i) => { if (h !== null) this.postBusy[i] += this.overlap(this.postStart[i], this.horizon); });
-      if (this.kdrv !== null) this.kdrvBusy += this.overlap(this.kdrvStart, this.horizon);
-      this.locos.forEach(l => { if (l.state === 'погрузка') this.loaderBusy += this.overlap(l.loadT0, this.horizon); });
+      for (let k = 0; k < 2; k++) if (this.kdrv[k] !== null) this.kdrvBusy[k] += this.overlap(this.kdrvStart[k], this.horizon);
+      this.locos.forEach(l => { if (l.state === 'погрузка' && l.sys === 0 && !l.idle) this.loaderBusy += this.overlap(l.loadT0, this.horizon); });
     }
   }
 
@@ -501,6 +579,7 @@
       STATE_NAMES.forEach(s => { if (s !== 'вне работы') share[s] = tSum ? acc[s] / tSum : 0; });
       perLoco.push({
         id: l.id + 1, trips: l.trips, tonnes: r1(l.tonnes),
+        role: l.role, system: l.idle ? '—' : l.role,
         util: tSum ? work / tSum : 0, share,
         cycle_mean: cyc.length ? sum(cyc) / cyc.length : null,
       });
@@ -511,7 +590,8 @@
     });
 
     const inTransit = sum(eng.locos.map(l => l.cargo));
-    const planTotal = eng.P.plan_shift * nShifts;
+    const pl = K.plans(P);
+    const planTotal = pl[2] * nShifts;
     const tonnes = eng.unloadedTotal;
     const trains = sum(eng.locos.map(l => l.trips));
 
@@ -526,8 +606,22 @@
       q_loader: stepSeries(eng.qLoader, grid),
     };
     const tracks = eng.locos.map(l => l.states.map(s =>
-      [r1(s[0]), r1(s[1]), STATE_IDX[s[2]], r1(s[3]), r1(s[4]), s[5] ? 1 : 0, s[6]]));
+      [r1(s[0]), r1(s[1]), STATE_IDX[s[2]], r1(s[3]), r1(s[4]), s[5] ? 1 : 0, s[6], s[7]]));
 
+    const act = perLoco.filter(p => p.system !== '—');
+    const systems = eng.sys.map((sy, i) => {
+      const mine = perLoco.filter(p => p.system === sy.name);
+      const tn = eng.sysUnloaded[sy.idx], pt = pl[i] * nShifts;
+      return {
+        key: sy.name,
+        name: sy.idx === 0 ? 'SLC (прямая погрузка с АТУ)' : 'GSC (погрузка с ортов 26, 27, 28)',
+        n_loco: mine.length, n_posts: sy.p1 - sy.p0,
+        trains: sum(mine.map(p => p.trips)), tonnes: tn,
+        plan: pt, plan_pct: pt ? tn / pt : 0,
+        q_window: tSum ? tn / (tSum / 3600) : 0,
+        post_busy: eng.postBusy.slice(sy.p0, sy.p1).map(b => tSum ? b / tSum : 0),
+      };
+    });
     const cycAn = K.cycleAnalytic(P);
     const nodes = eng.laneG.eq.slice();
     const allCyc = allCycles;
@@ -537,17 +631,21 @@
         v_ms: eng.v, v_kmh: eng.v * 3.6, L_block: eng.Lb, L_train: eng.Lp, cap_loop: eng.capLoop,
         loss_accel: eng.lossA, loss_brake: eng.lossB, t_load_train: K.loadingTrainTime(P), cycle_analytic: cycAn,
         windows: wins.map(w => [w[0], w[1]]), horizon: hz, t_eff_sum: tSum, n_shifts: nShifts, plan_total: planTotal,
+        fleet: eng.fleet, plan_slc: pl[0] * nShifts, plan_gsc: pl[1] * nShifts,
+        t_load_train_gsc: eng.fleet.gsc > 0 ? K.gscSpotTime(P) + K.gscLoadTime(P) : 0,
+        cycle_analytic_gsc: eng.fleet.gsc > 0 ? K.cycleAnalyticGsc(P) : 0,
       },
       kpi: {
         trains, tonnes,
         plan_pct: planTotal ? tonnes / planTotal : 0,
         q_horizon: tonnes / (hz / 3600),
         q_window: tSum ? tonnes / (tSum / 3600) : 0,
-        util_mean: perLoco.length ? sum(perLoco.map(p => p.util)) / perLoco.length : 0,
+        util_mean: act.length ? sum(act.map(p => p.util)) / act.length : 0,
         cycle_mean: allCyc.length ? sum(allCyc) / allCyc.length : null,
         cycle_min: allCyc.length ? Math.min.apply(null, allCyc) : null,
         cycle_max: allCyc.length ? Math.max.apply(null, allCyc) : null,
         trains_needed: planTotal / (P.n_wagons * P.m_wag),
+        systems,
       },
       locos: perLoco,
       waits,
@@ -555,7 +653,8 @@
         blocks: eng.blocks.map(B => tSum ? B.busy / tSum : 0),
         posts: eng.postBusy.map(b => tSum ? b / tSum : 0),
         loader: tSum ? eng.loaderBusy / (tSum * Math.trunc(P.n_loader)) : 0,
-        kdrv: tSum ? eng.kdrvBusy / tSum : 0,
+        kdrv: tSum ? eng.kdrvBusy[0] / tSum : 0,
+        kdrv_list: eng.kdrvBusy.map(b => tSum ? b / tSum : 0),
         q_post_max: maxOf(eng.qPost, x => x[1]),
         q_kdrv_max: maxOf(eng.qKdrv, x => x[1]),
         q_loader_max: maxOf(eng.qLoader, x => x[1]),
@@ -568,6 +667,9 @@
       series, tracks, state_names: STATE_NAMES.slice(),
       route: {
         L_path: P.L_path, n_blocks: eng.laneG.m, nodes, n_posts: Math.trunc(P.n_posts),
+        n_posts_gsc: eng.sys.length > 1 ? eng.sys[1].p1 - eng.sys[1].p0 : 0,
+        post_names: eng.postNames,
+        nodes_gsc: eng.sys.length > 1 ? eng.sys[1].laneG.eq.slice() : [],
         post_xy: [10036, 33512], kdrv_xy: [8156, 33295],
         chord_m: Math.hypot(10036 - 8156, 33512 - 33295),
       },
@@ -581,13 +683,30 @@
     const tEff = (P.T_sm - P.t_to_start - P.t_to_end) * P.ktg;
     const low = c.links.find(x => x.key === c.bottleneck);
     const actual = tonnes / nShifts;
+    const lk = x => ({ key: x.key, name: x.name, rate: x.rate, tonnes_shift: x.rate * tEff / 3600 * mTrain });
     return {
       bottleneck: c.bottleneck, bottleneck_name: low.name, formula: low.formula,
       rate_max: c.rate_min, t_eff_shift: tEff, trains_max: c.trains_ref,
       tonnes_max: c.tonnes_ref, tonnes_actual: actual,
       pct_of_max: c.tonnes_ref ? actual / c.tonnes_ref : null,
-      links: c.links.map(x => ({ key: x.key, name: x.name, rate: x.rate, tonnes_shift: x.rate * tEff / 3600 * mTrain })),
+      links: c.links.map(lk),
+      systems: c.systems.map(x => ({
+        key: x.key, name: x.name, bottleneck: x.bottleneck, bottleneck_name: x.bottleneck_name, formula: x.formula,
+        rate_max: x.rate_min, trains_max: x.trains_ref, tonnes_max: x.tonnes_ref, links: x.links.map(lk),
+      })),
     };
+  }
+
+  /* Занятость блок-участка за цикл (sim/engine.py: _track_occ): [t_цикл, t_зан, блоки гружёного пути] */
+  function trackOcc(P, Lg, Le, S, xg, xe, nb, Lp, v) {
+    if (S > 0) {
+      const pg = splitLane(Lg, xg, S, nb), pe = splitLane(Le, xe, S, nb);
+      const free = pg.concat(pe).filter(x => !x[1]).map(x => x[0]);
+      const freeMax = free.length ? Math.max.apply(null, free) : 0;
+      return [Math.max(2 * (S + Lp) / v, (freeMax + Lp) / v), (S + Lp) / v, pg];
+    }
+    const tOcc = (P.L_path / nb + Lp) / v;
+    return [2 * tOcc, tOcc, null];
   }
 
   /* Схема без прогона: геометрия, кинематика, пропускная способность звеньев (sim/engine.py: scheme). */
@@ -604,35 +723,47 @@
     const cyc = K.cycleAnalytic(P);
     const mTrain = n * P.m_wag;
     const tEff = (P.T_sm - P.t_to_start - P.t_to_end) * P.ktg;
-    // занятость блока за цикл: общий блок проходят оба состава, свободный блок — один
-    let tOcc, tCycOcc, pg = null;
-    if (S > 0) {
-      pg = splitLane(Lg, P.x_obsh_g, S, nb);
-      const pe = splitLane(Le, P.x_obsh_p, S, nb);
-      const free = pg.concat(pe).filter(x => !x[1]).map(x => x[0]);
-      const freeMax = free.length ? Math.max.apply(null, free) : 0;
-      tOcc = (S + Lp) / v;
-      tCycOcc = Math.max(2 * (S + Lp) / v, (freeMax + Lp) / v);
-    } else { tOcc = (Lb + Lp) / v; tCycOcc = 2 * tOcc; }
+    const fl = K.fleet(P), dual = fl.gsc > 0, pl = K.plans(P);
+    const occ = trackOcc(P, Lg, Le, S, P.x_obsh_g || 0, P.x_obsh_p || 0, nb, Lp, v);
+    const tCycOcc = occ[0], tOcc = occ[1], pg = occ[2];
     const links = [
-      { key: 'locos', name: 'Электровозы Ferrit', rate: P.n_loco * 3600 / cyc, formula: 'n_ЭВ · 3600 / t_ц' },
+      { key: 'locos', name: 'Электровозы Ferrit', rate: fl.slc * 3600 / cyc, formula: 'n_ЭВ · 3600 / t_ц' },
       { key: 'posts', name: Math.trunc(P.n_posts) === 1 ? 'Пост прямой погрузки с АТУ (С-20)' : 'Посты погрузки С-14, С-15', rate: P.n_posts * 3600 / tLoad, formula: 'n_пост · 3600 / t_погр.сост' },
       { key: 'loader', name: 'ПДМ ST1030 №2', rate: P.n_loader * 3600 / (n * K.wagonLoadTime(P)), formula: 'n_ПДМ · 3600 / (n · t_ПДМ)' },
       { key: 'kdrv', name: 'КДРВ №2', rate: 3600 / P.t_unload, formula: '3600 / t_разгр' },
       { key: 'track', name: 'Блок-участок (два прохода за цикл)', rate: 3600 / tCycOcc, formula: S > 0 ? '3600 / (2 · (L_общ + L_п) / v)' : '3600 / (2 · (L_б + L_п) / v)' },
     ];
-    let low = links[0];
-    links.forEach(x => { if (x.rate < low.rate) low = x; });
-    const rateMin = low.rate;
-    const trainsRef = rateMin * tEff / 3600;
+    const pack = (key, name, lk) => {
+      let lw = lk[0];
+      lk.forEach(x => { if (x.rate < lw.rate) lw = x; });
+      const tr = lw.rate * tEff / 3600;
+      return { key, name, links: lk, bottleneck: lw.key, bottleneck_name: lw.name, formula: lw.formula, rate_min: lw.rate, trains_ref: tr, tonnes_ref: tr * mTrain };
+    };
+    const systems = [pack('SLC', 'SLC (прямая погрузка с АТУ)', links)];
+    if (dual) {
+      const l2 = K.lanesGsc(P);
+      const c2 = trackOcc(P, l2[0], l2[1], l2[2], P.x_obsh_g_gsc || P.x_obsh_g || 0, P.x_obsh_p_gsc || P.x_obsh_p || 0, nb, Lp, v)[0];
+      const tLoad2 = K.gscSpotTime(P) + K.gscLoadTime(P);
+      systems.push(pack('GSC', 'GSC (погрузка с ортов 26, 27, 28)', [
+        { key: 'locos', name: 'Электровозы Ferrit (GSC)', rate: fl.gsc * 3600 / K.cycleAnalyticGsc(P), formula: 'n_ЭВ,GSC · 3600 / t_ц' },
+        { key: 'posts', name: 'Орты 26, 27, 28 (скреперные лебёдки)', rate: P.n_posts_gsc * 3600 / tLoad2, formula: 'n_пост · 3600 / (t_пос + n · t_в)' },
+        { key: 'kdrv', name: Math.trunc(P.kdrv_gsc) === 1 ? 'КДРВ №1' : 'КДРВ №2 (общий)', rate: 3600 / P.t_unload, formula: '3600 / t_разгр' },
+        { key: 'track', name: 'Блок-участок (два прохода за цикл)', rate: 3600 / c2, formula: l2[2] > 0 ? '3600 / (2 · (L_общ + L_п) / v)' : '3600 / (2 · (L_б + L_п) / v)' },
+      ]));
+    }
+    const s0 = systems[0];
+    const trainsRef = sum(systems.map(x => x.trains_ref)), tonnesRef = sum(systems.map(x => x.tonnes_ref));
     let nodes = [];
     if (S > 0) nodes = lanePos(pg).map(x => x * P.L_path / Lg);
     else for (let i = 0; i <= nb; i++) nodes.push(i * Lb);
+    const g2 = K.lanesGsc(P);
     return {
       params: P,
       geometry: {
         L_path: P.L_path, n_blocks: S > 0 ? pg.length : nb, L_block: Lb, L_gruz: Lg, L_por: Le, L_obsh: S, nodes, L_train: Lp, L_razm: P.L_razm, cap_loop: cap,
-        n_posts: Math.trunc(P.n_posts), post_xy: [10036, 33512], kdrv_xy: [8156, 33295],
+        n_posts: Math.trunc(P.n_posts),
+        gsc: dual ? { L_gruz: g2[0], L_por: g2[1], L_obsh: g2[2], n_posts: Math.trunc(P.n_posts_gsc) } : null,
+        post_xy: [10036, 33512], kdrv_xy: [8156, 33295],
         chord_m: Math.hypot(10036 - 8156, 33512 - 33295),
       },
       kinematics: {
@@ -644,10 +775,11 @@
         cycle_analytic: cyc, t_eff_shift: tEff, m_train: mTrain,
       },
       capacity: {
-        links, bottleneck: low.key, rate_min: rateMin,
-        required_rate: tEff > 0 ? P.plan_shift / (mTrain * tEff / 3600) : null,
-        trains_ref: trainsRef, tonnes_ref: trainsRef * mTrain, tail_trains: Math.trunc(P.n_posts),
-        plan_shift: P.plan_shift, plan_pct_ref: P.plan_shift ? trainsRef * mTrain / P.plan_shift : null,
+        links, bottleneck: s0.bottleneck, rate_min: s0.rate_min,
+        required_rate: tEff > 0 ? pl[2] / (mTrain * tEff / 3600) : null,
+        trains_ref: trainsRef, tonnes_ref: tonnesRef, tail_trains: Math.trunc(P.n_posts) + (dual ? Math.trunc(P.n_posts_gsc) : 0),
+        plan_shift: pl[2], plan_pct_ref: pl[2] ? tonnesRef / pl[2] : null,
+        systems,
       },
     };
   }

@@ -16,6 +16,25 @@
 
 <section class="card" id="flowCard"></section>
 
+<section class="card" id="fleetCard">
+  <h3>Системы разработки и парк электровозов</h3>
+  <p class="hint">Две системы работают на общем путевом хозяйстве: <b>SLC</b> (прямая погрузка с АТУ, сопряжение С-20, один состав) и <b>GSC</b> (погрузка скреперными лебёдками с откаточных ортов №26, №27, №28, три независимых поста). План шахты — сумма планов систем. Роль каждого электровоза выбирается вручную: SLC, GSC, резерв, ремонт или уборка породы. Электровозы в резерве, ремонте и на породе рудную откатку не ведут.</p>
+  <div class="row">
+    <label>План SLC в смену, т <input id="planSlc" type="number" min="0" max="20000" step="10" inputmode="decimal"></label>
+    <label>План GSC в смену, т <input id="planGsc" type="number" min="0" max="20000" step="10" inputmode="decimal"></label>
+    <label>План шахты, т <input id="planAll" type="text" readonly></label>
+  </div>
+  <div id="roleGrid" class="roles" role="group" aria-label="Роли электровозов"></div>
+  <div class="row mb">
+    <button id="btnLocoAdd" class="btn" type="button">+ электровоз</button>
+    <button id="btnLocoDel" class="btn" type="button">− электровоз</button>
+    <button id="btnFleetSave" class="btn" type="button">Применить</button>
+    <button id="btnFleetReset" class="btn" type="button">Вернуть значения справочника</button>
+    <span id="fleetMsg" class="msg" role="status"></span>
+  </div>
+  <p class="hint" id="fleetSum"></p>
+</section>
+
 <section class="card">
   <div class="row">
     <label>Режим

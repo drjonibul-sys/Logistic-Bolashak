@@ -55,6 +55,26 @@ function render() {
         .concat([`<tr class="hl"><td></td><td class="l">Итого, ${PL.CYC[k][dir].length} узлов</td><td></td><td>${fmt(c.L, 0)}</td><td>${fmt(c.Lk, 0)}</td></tr>`])) +
       `</section>`;
   }));
+  /* 2д. маршруты GSC (скреперные лебёдки): орты №26, №27, №28, разгрузка на КДРВ-1 (рудоспуск №1) или КДРВ-2 */
+  const kg = P.kdrv_gsc === 2 ? 2 : 1;
+  const gl = PL.gscLanes(kg, kd);
+  const avg = f => gl.reduce((a, x) => a + x[f], 0) / gl.length;
+  h += `<section class="card"><h3>2д. Маршруты GSC: орты №26, №27, №28 → КДРВ-${kg}</h3>` +
+    '<p class="hint">Порожний состав идёт от рудоспуска КДРВ-1 через С-3, С-2, обгонную ствола «Вентиляционный», С-8, С-7, грузовой квершлаг №1, С-9, С-53, С-10, откаточный квершлаг 1, С-50, откаточный штрек Восточный, С-47, С-48, С-68, С-69, Юго-Восточный штрек и С-45 на орт. Выезд с орта — через С-54 (орт №26), С-57 (№27) или С-58 (№28), далее Юго-Западный штрек, С-32, С-31, откаточный штрек западный на КДРВ-1 или КДРВ-2. Длины — хорда × k<sub>изв</sub>.</p>' +
+    table(['Орт', 'Гружёный путь L_гр, м', 'Порожний путь L_пор, м', 'Общий участок L_общ, м', 'До С-9 по гружёному, м', 'До С-9 по порожнему, м'],
+      gl.map(x => `<tr><td class="l">Орт №${x.ort}</td><td>${fmt(x.Lg, 0)}</td><td>${fmt(x.Le, 0)}</td><td>${fmt(x.S, 0)}</td><td>${fmt(x.xg, 0)}</td><td>${fmt(x.xe, 0)}</td></tr>`)
+        .concat([`<tr class="hl"><td class="l">Среднее по трём ортам</td><td>${fmt(avg('Lg'), 0)}</td><td>${fmt(avg('Le'), 0)}</td><td>${fmt(avg('S'), 0)}</td><td>${fmt(avg('xg'), 0)}</td><td>${fmt(avg('xe'), 0)}</td></tr>`])) +
+    `<p class="hint">В расчёте GSC используются средние длины по ортам (справочник блока −480, поле lanes.gsc). Сейчас в справочнике: гружёный ${fmt((P.L_gruz_gsc || 0), 0)} м, порожний ${fmt((P.L_por_gsc || 0), 0)} м.</p></section>`;
+  [26, 27, 28].forEach(ort => ['empty', 'loaded'].forEach(dir => {
+    const r = PL.gscRoute(ort, kg), c = PL.cycleLegs(r, dir, kd), ids = r[dir];
+    h += `<section class="card"><h3>2${'абвгдежзиклмн'[cn + 1] || ''}. ${dir === 'empty' ? 'Порожний состав' : 'Гружёный состав'}: ${esc(r.name)}</h3>` +
+      table(['№', 'Узел (по чертежу от 26.09.2026)', 'Участок до узла, м', 'Накоплено, м', 'С учётом k<sub>изв</sub>, м'],
+        [`<tr><td>1</td><td class="l">${esc(PL.byId[ids[0]].name)}</td><td>—</td><td>0</td><td>0</td></tr>`].concat(c.legs.map((l, i) =>
+          `<tr><td>${i + 2}</td><td class="l">${esc(l.to.name)}</td><td>${fmt(l.L, 0)}</td><td>${fmt(l.cum, 0)}</td><td>${fmt(l.cumK, 0)}</td></tr>`))
+        .concat([`<tr class="hl"><td></td><td class="l">Итого, ${ids.length} узлов</td><td></td><td>${fmt(c.L, 0)}</td><td>${fmt(c.Lk, 0)}</td></tr>`])) +
+      '</section>';
+    cn++;
+  }));
   /* 3. плечи из справочника блоков */
   const rows = [];
   BL.blocks.forEach(b => {
@@ -118,7 +138,7 @@ function onAct(ev) {
 }
 
 function draw() {
-  PL.draw($('#cvNodes'), { view: $('#ndView').value, css: cssVar, setup: setupCanvas, items: [] });
+  PL.draw($('#cvNodes'), { view: $('#ndView').value, css: cssVar, setup: setupCanvas, items: [], gsc: P && P.kdrv_gsc === 2 ? 2 : 1 });
 }
 
 boot(async () => {

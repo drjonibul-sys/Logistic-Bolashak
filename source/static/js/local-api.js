@@ -111,10 +111,45 @@
     const ln = BL.lanesOf(blocksValues(), 'm480');
     if (ln) {   // значения блока −480 действуют, пока их не задали вручную в справочнике
       const mine = { L_gruz: ln.Lg, L_por: ln.Le, L_obsh: ln.S, x_obsh_g: ln.xg, x_obsh_p: ln.xe, n_posts: Math.round(ln.posts) };
+      if (ln.gsc) {   // две системы разработки: GSC (орты 26, 27, 28), планы систем и распределение парка электровозов
+        Object.assign(mine, {
+          L_gruz_gsc: ln.gsc.Lg, L_por_gsc: ln.gsc.Le, x_obsh_g_gsc: ln.gsc.xg, x_obsh_p_gsc: ln.gsc.xe, n_posts_gsc: Math.round(ln.gsc.posts),
+          plan_slc: ln.plan.slc, plan_gsc: ln.plan.gsc,
+          n_loco_gsc: Math.round(ln.fleet.gsc), n_loco_rez: Math.round(ln.fleet.rez), n_loco_rem: Math.round(ln.fleet.rem), n_loco_por: Math.round(ln.fleet.por),
+        });
+      }
       Object.keys(mine).forEach(k => { if (!(over && typeof over === 'object' && k in over)) vals[k] = mine[k]; });
+    }
+    const fl = store.get('fleet');
+    if (fl && Array.isArray(fl.roles) && fl.roles.length) {   // ручное распределение ролей и планы систем (страница «Электровозы») действуют поверх справочника
+      const cnt = r => fl.roles.filter(x => x === r).length;
+      Object.assign(vals, { n_loco: fl.roles.length, n_loco_gsc: cnt('GSC'), n_loco_rez: cnt('rez'), n_loco_rem: cnt('rem'), n_loco_por: cnt('por') });
+      ['plan_slc', 'plan_gsc'].forEach(k => { if (k in fl) vals[k] = fl[k]; });
     }
     const v = LG.validate(vals);
     return v.errors.length ? LG.defaults() : v.clean;
+  }
+  const FLEET_ROLES = ['SLC', 'GSC', 'rez', 'rem', 'por'];
+  /* роли электровозов по очереди (SLC, GSC, резерв, ремонт, порода) и планы систем, как они действуют в расчёте */
+  function fleetView() {
+    const v = referenceValues(), f = LG.K.fleet(v), pl = LG.K.plans(v);
+    const roles = [];
+    [['SLC', f.slc], ['GSC', f.gsc], ['rez', f.rez], ['rem', f.rem], ['por', f.por]].forEach(r => { for (let i = 0; i < r[1]; i++) roles.push(r[0]); });
+    return { roles, plan_slc: pl[0], plan_gsc: pl[1], custom: !!store.get('fleet') };
+  }
+  function fleetClean(data) {
+    const roles = data.roles;
+    if (!Array.isArray(roles) || roles.length < 1 || roles.length > 30 || roles.some(r => FLEET_ROLES.indexOf(r) < 0)) {
+      throw fail(422, 'Роли электровозов: от 1 до 30 значений SLC, GSC, rez, rem, por');
+    }
+    const out = { roles: roles.slice().sort((a, b) => FLEET_ROLES.indexOf(a) - FLEET_ROLES.indexOf(b)) };
+    ['plan_slc', 'plan_gsc'].forEach(k => {
+      const x = data[k] === undefined ? 0 : Number(data[k]);
+      if (!Number.isFinite(x)) throw fail(422, 'План: не число');
+      if (x < 0 || x > 20000) throw fail(422, 'План: допустимо от 0 до 20000 т');
+      out[k] = x;
+    });
+    return out;
   }
   const sameValues = (a, b) => {
     const ka = Object.keys(a);
@@ -173,6 +208,7 @@
         return { groups: JSON.parse(JSON.stringify(LG.GROUPS)), values: referenceValues(), defaults: LG.defaults() };
       }
       if (path === '/api/blocks') return { blocks: blocksValues().blocks, defaults: BL.defaults().blocks };
+      if (path === '/api/fleet') return fleetView();
       if (path === '/api/scheme') return LG.scheme(referenceValues());
       if (path === '/api/last') return lastView(query.split('&').indexOf('brief=1') >= 0);
       if (path === '/api/admin/info') { needAdmin(); return adminInfo(); }
@@ -229,6 +265,15 @@
       if (v.errors.length) throw fail(422, v.errors.join('; '));
       store.set('reference', v.clean);
       return { ok: true, values: v.clean };
+    }
+    // распределение электровозов по ролям и планы систем правят все пользователи
+    if (method === 'PUT' && path === '/api/fleet') {
+      store.set('fleet', fleetClean(data));
+      return Object.assign(fleetView(), { ok: true });
+    }
+    if (method === 'POST' && path === '/api/fleet/reset') {
+      store.del('fleet');
+      return Object.assign(fleetView(), { ok: true });
     }
     if (method === 'POST' && path === '/api/reference/reset') {
       store.del('reference');

@@ -282,10 +282,23 @@ try:
         check('расчёт: пока пусто', pg.locator('#resEmpty').is_visible() and pg.locator('#resBox').is_hidden())
         pg.click('#btnRun')
         pg.wait_for_function("() => document.querySelector('#runMsg').textContent.startsWith('Готово')", timeout=20000)
-        check('расчёт: плитки', pg.locator('#tiles .tile').count() == 5)
+        check('расчёт: плитки (5 общих и 2 по системам)', pg.locator('#tiles .tile').count() == 7, pg.locator('#tiles .tile').count())
         check('расчёт: выводы', pg.locator('#findings li').count() >= 4, pg.locator('#findings li').count())
         check('расчёт: баланс верен', 'верно' in pg.inner_text('#checks'))
         shot('02_run_shift', True)
+        # --- две системы разработки: роли электровозов и планы
+        roles = pg.evaluate("() => [...document.querySelectorAll('#roleGrid select')].map(s => s.value).join()")
+        check('роли: SLC 3, GSC 3, резерв 1', roles == 'SLC,SLC,SLC,GSC,GSC,GSC,rez', roles)
+        check('роли: общий план шахты 2880 т', pg.input_value('#planAll').replace('\xa0', '').replace(' ', '') == '2880', pg.input_value('#planAll'))
+        pg.select_option('#roleGrid label:nth-child(7) select', 'GSC')
+        pg.click('#btnFleetSave')
+        pg.wait_for_function("() => document.querySelector('#fleetMsg').textContent.startsWith('Применено')", timeout=5000)
+        roles2 = pg.evaluate("() => [...document.querySelectorAll('#roleGrid select')].map(s => s.value).join()")
+        check('роли: выбор сохранён, электровозы упорядочены по ролям', roles2 == 'SLC,SLC,SLC,GSC,GSC,GSC,GSC', roles2)
+        pg.click('#btnFleetReset')
+        pg.wait_for_function("() => document.querySelector('#fleetMsg').textContent.startsWith('Возвращены')", timeout=5000)
+        roles3 = pg.evaluate("() => [...document.querySelectorAll('#roleGrid select')].map(s => s.value).join()")
+        check('роли: сброс к справочнику', roles3 == 'SLC,SLC,SLC,GSC,GSC,GSC,rez', roles3)
 
         # --- переход по меню на анимацию: результат виден на другой странице
         pg.click('nav.side a[href="animation.html"]')
@@ -323,6 +336,7 @@ try:
         pg.wait_for_selector('#kpiBox:not([hidden]) table')
         check('показатели: таблицы', pg.locator('#kpiBox table').count() >= 6, pg.locator('#kpiBox table').count())
         check('показатели: плитки', pg.locator('#kpiBox .tile').count() == 5)
+        check('показатели: план и факт по системам', 'Всего по шахте' in pg.inner_text('#kpiBox') and 'GSC' in pg.inner_text('#kpiBox'))
         shot('05_kpi', True)
         pg.click('nav.side a[href="charts.html"]')
         pg.wait_for_selector('#chBox:not([hidden])')
@@ -478,6 +492,8 @@ try:
         pg.fill('input[data-key=n_posts]', '2')
         pg.fill('input[data-key=n_loader]', '1')
         pg.fill('input[data-key=L_obsh]', '0')   # блокировка возможна при общем пути (прежняя модель)
+        pg.fill('input[data-key=n_loco_gsc]', '0')   # одна система SLC
+        pg.fill('input[data-key=n_loco_rez]', '0')
         pg.fill('input[data-key=L_gruz]', '0')
         pg.fill('input[data-key=L_por]', '0')
         pg.click('#btnRefSave')
@@ -510,7 +526,7 @@ try:
             import json
             pg.click('#btnMoveShow')
             vals = json.loads(pg.input_value('#moveText'))
-            check('перенос: показаны все 209 параметра', vals.get('n_loco') == 7 and len(vals) == 209, len(vals))
+            check('перенос: показаны все 221 параметр', vals.get('n_loco') == 7 and len(vals) == 221, len(vals))
             pg.fill('#moveText', '{oops')
             pg.click('#btnMoveLoad')
             pg.wait_for_function("() => document.querySelector('#moveMsg').textContent.length > 0 && document.querySelector('#moveMsg').classList.contains('err')")
@@ -541,7 +557,7 @@ try:
         # справка
         go('/help.html')
         pg.wait_for_selector('#helpLegend span')
-        check('справка: легенда состояний', pg.locator('#helpLegend span').count() == 13, pg.locator('#helpLegend span').count())
+        check('справка: легенда состояний', pg.locator('#helpLegend span').count() == 16, pg.locator('#helpLegend span').count())
         check('справка: формулы', pg.locator('.formula').count() >= 15, pg.locator('.formula').count())
         shot('15_help', True)
 

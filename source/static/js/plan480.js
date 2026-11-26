@@ -89,6 +89,15 @@
     ['otsw2', 'Откаточный штрек западный (восток)', 9405.5, 33695.8, 'drift', 0, null],
     ['gk1c', 'Грузовой квершлаг 1 (нижний участок)', 8399.6, 33565.0, 'drift', 0, null],
     ['otsw3', 'Откаточный штрек западный (запад)', 9015.7, 33832.9, 'drift', 0, null],
+    /* Маршруты GSC (скреперные лебёдки, орты №26, №27, №28) по выноскам чертежа и заданию от 26.11.2026 */
+    ['j69', 'Сопряжение С-69 (51)', 10026.6, 33844.3, 'junc', 0, [10, 0, 'l']],
+    ['j45', 'Сопряжение С-45 (49)', 10110.5, 33528.6, 'junc', 0, [10, 0, 'l']],
+    ['e27', 'Юго-Восточный штрек: заезд на орт №27', 10110.6, 33459.4, 'junc', 0, null],
+    ['e28', 'Юго-Восточный штрек: заезд на орт №28', 10130.5, 33401.9, 'junc', 0, null],
+    ['j54', 'Сопряжение С-54 (выезд с орта №26)', 9657.3, 33366.3, 'junc', 0, [-8, 0, 'r']],
+    ['j57', 'Сопряжение С-57 (49) (выезд с орта №27)', 9687.8, 33314.0, 'junc', 0, [-8, 0, 'r']],
+    ['j58', 'Сопряжение С-58 (47) (выезд с орта №28)', 9710.6, 33267.6, 'junc', 0, [-8, 0, 'r']],
+    ['j32', 'Сопряжение С-32', 9496.9, 33645.4, 'junc', 0, [0, 14, 'c']],
   ];
   const BASE = N.map(n => ({ id: n[0], name: n[1], x: n[2], y: n[3], kind: n[4], route: !!n[5], lab: n[6] }));
   const NODES = [], byId = {};
@@ -97,6 +106,22 @@
      (прямая погрузка с АТУ), гружёный возвращается к рудоспуску. Для КДРВ-2 общая часть та же; заезд через С-3 (50), выезд через С-1 (46) и С-2. */
   const EMPTY_TAIL = ['ov', 'j8', 'obg', 'j7', 'gk1', 'j9', 'j53', 'gk1b', 'j10', 'ok1', 'j50', 'osv1', 'j47', 'j48', 'osv2', 'j68', 'j70', 'o20', 'j30', 'j31', 'otsw2', 's20'];
   const LOADED_HEAD = ['s20', 's55', 'c1', 'otsw', 'otsw3', 'j52', 'j9', 'gk1', 'gk1c', 'j6', 'j5', 'j4', 'zop', 'kdrv2', 'j3b'];
+  /* GSC: порожний состав идёт от рудоспуска №1 (КДРВ-1) до орта, гружёный — с орта через Юго-Западный штрек и С-32, С-31 к КДРВ.
+     Заезд на орт с востока (Юго-Восточный штрек, С-45), выезд на запад через С-54 (орт №26), С-57 (№27) или С-58 (№28). */
+  const GSC_EMPTY_COMMON = EMPTY_TAIL.slice(0, EMPTY_TAIL.indexOf('j68') + 1).concat(['j69', 'yv', 'j45']);
+  const GSC_ORTS = {
+    26: { name: 'орт №26', post: 'o26', empty: ['o26'], loaded: ['o26', 'j54'] },
+    27: { name: 'орт №27', post: 'o27', empty: ['e27', 'o27'], loaded: ['o27', 'j57', 'j54'] },
+    28: { name: 'орт №28', post: 'o28', empty: ['e27', 'e28', 'o28'], loaded: ['o28', 'j58', 'j57', 'j54'] },
+  };
+  const GSC_LOADED_COMMON = ['yz', 'j32', 'j31', 'otsw2'].concat(LOADED_HEAD.slice(LOADED_HEAD.indexOf('otsw')));
+  /* маршрут GSC: ort — 26, 27, 28; k — 1 (КДРВ-1) или 2 (КДРВ-2) */
+  function gscRoute(ort, k) {
+    const o = GSC_ORTS[ort];
+    const dump = k === 1 ? ['kdrv1', 'j37', 'gvk1', 'rs1'] : ['rs2'];
+    const head = k === 1 ? ['rs1', 'pvk1', 'j3a', 'j2a'] : ['rs2', 'j1b', 'j2a'];
+    return { name: 'GSC ' + o.name + ' → КДРВ-' + k, loaded: o.loaded.concat(GSC_LOADED_COMMON, dump), empty: head.concat(GSC_EMPTY_COMMON, o.empty) };
+  }
   const CYC = {
     1: { name: 'КДРВ-1 (рудоспуск №1)', dump: 'rs1', loaded: LOADED_HEAD.concat(['kdrv1', 'j37', 'gvk1', 'rs1']), empty: ['rs1', 'pvk1', 'j3a', 'j2a'].concat(EMPTY_TAIL) },
     2: { name: 'КДРВ-2 (рудоспуск №2)', dump: 'rs2', loaded: LOADED_HEAD.concat(['rs2']), empty: ['rs2', 'j1b', 'j2a'].concat(EMPTY_TAIL) },
@@ -145,9 +170,19 @@
     for (let i = 1; i < T.pts.length; i++) T.cum.push(T.cum[i - 1] + dist(T.pts[i - 1], T.pts[i]));
     T.L = T.cum[T.cum.length - 1];
   }
+  /* Таблицы маршрутов GSC по ортам: ключ «орт|КДРВ|направление», пересобираются вместе с узлами */
+  const GT = {};
+  const GIDS = new Set();
+  Object.keys(GSC_ORTS).forEach(o => [1, 2].forEach(k => { const r = gscRoute(+o, k); r.loaded.concat(r.empty).forEach(id => GIDS.add(id)); }));
+  function gscTable(ort, k, dir) {
+    const key = ort + '|' + k + '|' + dir;
+    if (!GT[key]) { const T = { ids: [], pts: [], cum: [0], L: 0 }; fill(T, gscRoute(ort, k)[dir]); GT[key] = T; }
+    return GT[key];
+  }
   function rebuild() {
     fill(RT, ROUTE); fill(RE, EMPTY);
-    NODES.forEach(n => { n.route = ROUTE.indexOf(n.id) >= 0; n.routeE = EMPTY.indexOf(n.id) >= 0; });
+    Object.keys(GT).forEach(k => delete GT[k]);
+    NODES.forEach(n => { n.route = ROUTE.indexOf(n.id) >= 0; n.routeE = EMPTY.indexOf(n.id) >= 0; n.routeG = GIDS.has(n.id); });
   }
   /* Правки пользователя: n — наименование и координаты узлов по id, c — добавленные узлы, r — порядок узлов трассы (null — по умолчанию) */
   const KEY = 'lg.plan.ov';
@@ -180,9 +215,10 @@
   apply(null);
 
   /* Точка трассы по доле пути f ∈ [0; 1] и направление хода (единичный вектор от поста к КДРВ) */
-  function at(f, loaded) {
+  function at(f, loaded, gsc) {
     f = Math.max(0, Math.min(1, f));
-    const T = loaded === false ? RE : RT;           // порожний состав идёт по своей трассе, от разгрузки (f = 1) к погрузке (f = 0)
+    // gsc = {ort, k}: состав GSC идёт по маршруту своего орта к КДРВ-1 или КДРВ-2
+    const T = gsc ? gscTable(gsc.ort, gsc.k, loaded === false ? 'empty' : 'loaded') : (loaded === false ? RE : RT);           // порожний состав идёт по своей трассе, от разгрузки (f = 1) к погрузке (f = 0)
     const s = (loaded === false ? 1 - f : f) * T.L;
     let i = 1;
     while (i < T.cum.length - 1 && T.cum[i] < s) i++;
@@ -199,9 +235,23 @@
     return out;
   }
 
+  /* Длины маршрутов GSC по ортам и КДРВ: гружёный/порожний путь, общий участок (грузовой квершлаг №1) и его начало на каждом пути, м (хорда × kdev) */
+  function gscLanes(k, kdev) {
+    const kd = kdev || 1.3;
+    const out = [];
+    [26, 27, 28].forEach(ort => {
+      const r = gscRoute(ort, k);
+      const g = cycleLegs(r, 'loaded', kd), e = cycleLegs(r, 'empty', kd);
+      const cum = (T, id) => { const i = T.legs.findIndex(x => x.to.id === id); return i < 0 ? null : T.legs[i].cumK; };
+      const gj9 = cum(g, 'j9'), gj6 = cum(g, 'j6'), ej9 = cum(e, 'j9');
+      out.push({ ort, Lg: g.Lk, Le: e.Lk, S: gj6 - gj9, xg: gj9, xe: e.Lk - ej9, nodesG: r.loaded.length, nodesE: r.empty.length });
+    });
+    return out;
+  }
+
   /* Участки одного из маршрутов цикла: k — 1 (КДРВ-1) или 2 (КДРВ-2), dir — 'loaded' или 'empty'; kdev — коэффициент извилистости выработок */
   function cycleLegs(k, dir, kdev) {
-    const ids = CYC[k][dir], out = []; let cum = 0;
+    const ids = (typeof k === 'object' ? k : CYC[k])[dir], out = []; let cum = 0;
     for (let i = 1; i < ids.length; i++) {
       const a = byId[ids[i - 1]], b = byId[ids[i]], L = dist([a.x, a.y], [b.x, b.y]);
       cum += L; out.push({ from: a, to: b, L, Lk: L * (kdev || 1), cum, cumK: cum * (kdev || 1) });
@@ -211,7 +261,7 @@
 
   /* Рисование на холсте. view: 'route' — трасса электровозов, 'all' — весь план. items: [{f, loaded, id, wait, slot}] */
   function bounds(view) {
-    const b = view === 'all' ? [7780, 33180, 10200, 34400] : [7650, 33230, 10260, 34340];
+    const b = view === 'all' ? [7780, 33180, 10300, 34400] : [7650, 33230, 10340, 34340];
     RT.pts.concat(RE.pts, NODES.filter(n => n.custom || n.edited).map(n => [n.x, n.y])).forEach(p => {
       b[0] = Math.min(b[0], p[0] - 60); b[1] = Math.min(b[1], p[1] - 60); b[2] = Math.max(b[2], p[0] + 60); b[3] = Math.max(b[3], p[1] + 60);
     });
@@ -232,6 +282,9 @@
     poly(RE.pts, '#9db8d6', 5);
     poly(RT.pts, '#d9b38a', 5);
     poly(RT.pts, css('--panel'), 1.5, [6, 6]);
+    if (o.gsc) {   // маршруты GSC: три орта, КДРВ-1 или КДРВ-2
+      [26, 27, 28].forEach(ort => { poly(gscTable(ort, o.gsc, 'empty').pts, '#7fb8a4', 3); poly(gscTable(ort, o.gsc, 'loaded').pts, '#c9a15e', 3, [8, 5]); });
+    }
     /* подписи фоновых линий */
     g.fillStyle = muted; g.font = '11px "Segoe UI", sans-serif'; g.textAlign = 'left';
     g.fillText('АТУ', X(9501) + 4, Y(33813) - 8);
@@ -243,8 +296,8 @@
     NODES.forEach(n => {
       if (n.x < B[0] || n.x > B[2] || n.y < B[1] || n.y > B[3]) return;
       const lab = n.lab || (n.route || n.custom ? [10, -12, 'l'] : null);
-      const labeled = !!lab && (view === 'all' ? (n.route || n.custom || ['p402', 'kdrv1', 'skip', 'vent'].includes(n.id)) : true);
-      const onR = n.route || n.routeE;
+      const labeled = !!lab && (view === 'all' ? (n.route || (o.gsc && n.routeG) || n.custom || ['p402', 'kdrv1', 'skip', 'vent'].includes(n.id)) : true);
+      const onR = n.route || n.routeE || (o.gsc && n.routeG);
       if (view === 'route' && !onR && !n.custom && !['c15', 'c16', 'kdrv1', 'skip', 'vent'].includes(n.id)) return;
       g.fillStyle = onR ? acc : (n.kind === 'shaft' ? '#8c3a6a' : n.kind === 'pocket' ? '#7a4fa3' : muted);
       const r = n.kind === 'dump' ? 6 : onR ? 5 : 4;
@@ -259,7 +312,7 @@
     });
     /* составы */
     (o.items || []).forEach(it => {
-      const p = at(it.f, it.loaded), px = X(p.x), py = Y(p.y), ox2 = -p.uy * (it.slot || 0) * 12, oy2 = -p.ux * (it.slot || 0) * 12;
+      const p = at(it.f, it.loaded, it.gsc), px = X(p.x), py = Y(p.y), ox2 = -p.uy * (it.slot || 0) * 12, oy2 = -p.ux * (it.slot || 0) * 12;
       g.beginPath(); g.arc(px + ox2, py + oy2, 8, 0, 6.2832);
       g.fillStyle = it.off ? '#c9d1d9' : it.loaded ? '#d9822b' : '#3b82c4'; g.fill();
       g.lineWidth = it.wait ? 2.5 : 1; g.strokeStyle = it.wait ? '#b3261e' : 'rgba(0,0,0,.4)'; g.stroke();
@@ -270,5 +323,5 @@
   }
   const shorten = s => s.replace('Карман С-14 (порода)', 'Посты: карманы С-14, С-15, С-16').replace('Заезд на камеру опрокидывателя №2 (КДРВ №2)', 'КДРВ №2').replace('Заезд на камеру донной разгрузки вагонеток №1 (КДРВ №1)', 'КДРВ №1');
 
-  return { K, BASE, NODES, byId, ROUTE, EMPTY, CYC, RT, RE, cycleLegs, ATU, ORTS, DRIFTS, SECTIONS, at, legs, draw, ortLine, bounds, dist, apply, load, stored, emptyOv, KEY, BASE_ROUTE, BASE_EMPTY };
+  return { K, BASE, NODES, byId, ROUTE, EMPTY, CYC, GSC_ORTS, gscRoute, gscLanes, gscTable, RT, RE, cycleLegs, ATU, ORTS, DRIFTS, SECTIONS, at, legs, draw, ortLine, bounds, dist, apply, load, stored, emptyOv, KEY, BASE_ROUTE, BASE_EMPTY };
 }));

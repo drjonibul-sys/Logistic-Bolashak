@@ -17,6 +17,8 @@ const hm = s => hms(s).slice(0, 5);
 const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 /* название поста: при одном посте это прямая погрузка с АТУ (С-20), иначе камеры С-14 и С-15 */
 const postName = (i, n) => n === 1 ? 'С-20 (АТУ)' : i === 0 ? 'С-14' : i === 1 ? 'С-15' : 'Пост ' + (i + 1);
+/* Название поста по результату расчёта: при двух системах — из route.post_names (SLC, затем орты GSC) */
+const postLabel = (R, i) => (R && R.route && R.route.post_names && R.route.post_names[i]) || postName(i, R && R.params ? R.params.n_posts : 0);
 const kindName = k => k === 'day' ? 'сутки' : 'смена';
 const modeName = m => m === 'stochastic' ? 'стохастический' : 'детерминированный';
 

@@ -125,3 +125,54 @@ def cycle_analytic(p: dict) -> float:
     lg, le, _ = lanes(p)
     return (loading_train_time(p) + p["t_unload"]
             + (lg + le) / v + 2.0 * stop_loss(v, p["a"], p["b"]))
+
+
+def fleet(p: dict) -> dict:
+    """Распределение электровозов по ролям (задаётся вручную): GSC, резерв, ремонт, уборка породы; остальные — SLC.
+
+    n_SLC = n_ЭВ − n_GSC − n_рез − n_рем − n_пор. Роли берутся по порядку, каждая ограничена остатком парка."""
+    n = int(p["n_loco"])
+    left = n
+    out = {}
+    for key, name in (("gsc", "n_loco_gsc"), ("rez", "n_loco_rez"), ("rem", "n_loco_rem"), ("por", "n_loco_por")):
+        c = max(0, min(int(p.get(name, 0) or 0), left))
+        out[key] = c
+        left -= c
+    out["slc"] = left
+    return out
+
+
+def plans(p: dict):
+    """План в смену по системам разработки, т: (SLC, GSC, всего).
+
+    Если заданы план SLC или GSC, общий план шахты — их сумма; иначе используется прежний plan_shift (всё на SLC)."""
+    a, b = p.get("plan_slc", 0.0) or 0.0, p.get("plan_gsc", 0.0) or 0.0
+    if a + b > 0:
+        return a, b, a + b
+    return p["plan_shift"], 0.0, p["plan_shift"]
+
+
+def gsc_spot_time(p: dict) -> float:
+    """Подача и смена состава у люка орта (GSC), с: t_пос = s_t_spot · 60."""
+    return p["s_t_spot"] * 60.0
+
+
+def gsc_load_time(p: dict) -> float:
+    """Погрузка состава скреперными лебёдками, с: n · s_t_wag · 60 (вагоны грузятся последовательно)."""
+    return p["n_wagons"] * p["s_t_wag"] * 60.0
+
+
+def lanes_gsc(p: dict):
+    """Длины гружёного и порожнего пути GSC и общего участка, м. Нулевые значения означают пути SLC."""
+    lg0, le0, s0 = lanes(p)
+    lg = p["L_gruz_gsc"] if p.get("L_gruz_gsc", 0) > 0 else lg0
+    le = p["L_por_gsc"] if p.get("L_por_gsc", 0) > 0 else le0
+    return lg, le, (min(s0, lg, le) if s0 > 0 else 0.0)
+
+
+def cycle_analytic_gsc(p: dict) -> float:
+    """Цикл электровоза GSC без ожиданий, с: t_пос + n·t_в + t_разгр + (L_гр + L_пор)/v + 2·(v/2a + v/2b)."""
+    v = speed_ms(p["v_kmh"], p["k_v"])
+    lg, le, _ = lanes_gsc(p)
+    return (gsc_spot_time(p) + gsc_load_time(p) + p["t_unload"]
+            + (lg + le) / v + 2.0 * stop_loss(v, p["a"], p["b"]))

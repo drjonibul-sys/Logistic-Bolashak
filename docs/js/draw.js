@@ -8,6 +8,7 @@ const COLORS = {
   'ожидание поста': '#e3b505', 'ожидание ПДМ': '#f0cf65', 'ожидание КДРВ': '#e07a5f',
   'ожидание блок-участка': '#c0392b', 'ожидание в выработке': '#8c2d2d', 'стоянка на разминовке': '#d35f8d',
   'вне работы': '#c9d1d9',
+  'резерв': '#b8c4a8', 'ремонт': '#a5a5a5', 'уборка породы': '#b79a7a',
 };
 const MOVE = ['ход гружёный', 'ход порожний'];
 const FONT = '12px "Segoe UI", sans-serif';
@@ -62,7 +63,7 @@ function drawRouteBase(g, w, route, F, occ) {
   g.fillStyle = cssVar('--bg'); g.strokeStyle = line; g.lineWidth = 1;
   g.fillRect(10, y0 - 40, padL - 28, 80); g.strokeRect(10, y0 - 40, padL - 28, 80);
   g.fillStyle = text; g.textAlign = 'center';
-  g.fillText('КДРВ №2', 10 + (padL - 28) / 2, y0 - 8);
+  g.fillText(route.dump_label || 'КДРВ №2', 10 + (padL - 28) / 2, y0 - 8);
   g.fillStyle = muted; g.fillText('разгрузка', 10 + (padL - 28) / 2, y0 + 10);
 
   g.textAlign = 'left';
@@ -71,11 +72,12 @@ function drawRouteBase(g, w, route, F, occ) {
     g.fillStyle = cssVar('--bg'); g.strokeStyle = line;
     g.fillRect(w - padR + 4, yy - 13, padR - 14, 26); g.strokeRect(w - padR + 4, yy - 13, padR - 14, 26);
     g.fillStyle = muted; g.textAlign = 'right';
-    g.fillText(postName(p, np), w - 18, yy);
+    g.fillText(route.post_labels ? route.post_labels[p] : postName(p, np), w - 18, yy);
     g.textAlign = 'left';
   }
   g.fillStyle = muted;
-  g.fillText('ПДМ ST1030 №2', w - padR + 4, y0 + (np / 2) * 30 + 6);
+  if (route.loader !== false) g.fillText('ПДМ ST1030 №2', w - padR + 4, y0 + (np / 2) * 30 + 6);
+  if (route.title) { g.fillStyle = text; g.textAlign = 'left'; g.font = '600 12px "Segoe UI", sans-serif'; g.fillText(route.title, padL, y0 - 52); g.font = FONT; }
 
   g.lineCap = 'round';
   for (let b = 0; b < nb; b++) {
@@ -159,13 +161,13 @@ function drawGantt(cv, R) {
   const n = R.tracks.length, rh = 20;
   const { g, w } = setupCanvas(cv, n * rh + 56);
   const muted = cssVar('--muted'), line = cssVar('--line');
-  const L = 58, Rr = 14, T = 8;
+  const L = 112, Rr = 14, T = 8;
   const pw = w - L - Rr, H = R.derived.horizon;
   const sx = t => L + t / H * pw;
   g.font = FONT; g.textBaseline = 'middle';
   R.tracks.forEach((tr, i) => {
     const y = T + i * rh;
-    g.fillStyle = muted; g.textAlign = 'right'; g.fillText('ЭВ ' + (i + 1), L - 8, y + rh / 2);
+    g.fillStyle = muted; g.textAlign = 'right'; g.fillText('ЭВ ' + (i + 1) + (R.locos && R.locos[i] ? ' ' + (R.locos[i].system === '—' ? R.locos[i].role : R.locos[i].system) : ''), L - 8, y + rh / 2);
     tr.forEach(s => {
       const x1 = sx(s[0]), x2 = sx(s[1]);
       g.fillStyle = COLORS[R.state_names[s[2]]] || '#999';

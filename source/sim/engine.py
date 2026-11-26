@@ -17,7 +17,8 @@ UNL = ("разгрузка",)
 WAIT = ("ожидание поста", "ожидание ПДМ", "ожидание КДРВ",
         "ожидание блок-участка", "ожидание в выработке", "стоянка на разминовке")
 OFF = ("вне работы",)
-STATE_NAMES = list(MOVE + LOAD + UNL + WAIT + OFF)
+IDLE = ("резерв", "ремонт", "уборка породы")   # электровозы вне рудной откатки (атрибут задаётся вручную)
+STATE_NAMES = list(MOVE + LOAD + UNL + WAIT + OFF + IDLE)
 STATE_IDX = {s: i for i, s in enumerate(STATE_NAMES)}
 
 
@@ -82,9 +83,27 @@ class _Lane:
         self.parked = [0] * (self.m + 1)
 
 
+class _Sys:
+    """Система разработки: свои посты погрузки, полосы движения и время погрузки состава."""
+
+    def __init__(self, idx, name, lane_g, lane_e, p0, p1, t_spot):
+        self.idx = idx
+        self.name = name
+        self.lane_g = lane_g
+        self.lane_e = lane_e
+        self.p0 = p0
+        self.p1 = p1
+        self.t_spot = t_spot
+        self.post_q = []
+        self.kd = 0
+
+
 class _Loco:
     def __init__(self, i):
         self.id = i
+        self.sys = 0
+        self.role = "SLC"
+        self.idle = False
         self.node = 0
         self.dir = -1
         self.loaded = False
@@ -101,6 +120,8 @@ class _Loco:
         self.arr_t = 0.0
         self.load_t0 = 0.0
         self.post0 = -1
+        self.last_post = -1   # номер поста (в своей системе), на котором состав грузился последний раз
+        self.lp0 = -1
         self.states = []
         self.marks = []
         self.trips = 0
@@ -125,32 +146,63 @@ class Engine:
         pg = _split(Lg, P.get("x_obsh_g", 0.0), S, self.nb)
         pe = _split(Le, P.get("x_obsh_p", 0.0), S, self.nb)
         self.shared_mode = S > 0
+        fl = K.fleet(P)
+        self.fleet = fl
+        dual = fl["gsc"] > 0
         self.Lp = K.train_length(P["L_loco"], int(P["n_wagons"]), P["L_wag"])
         self.cap_loop = K.loop_capacity(P["L_razm"], self.Lp, P["L_zap"])
         self.loss_a = K.accel_loss(self.v, P["a"])
         self.loss_b = K.brake_loss(self.v, P["b"])
+        lane_specs = [(Lg, Le, pg, pe)]
+        if dual:
+            Lg2, Le2, S2 = K.lanes_gsc(P)
+            xg2 = P["x_obsh_g_gsc"] if P.get("x_obsh_g_gsc", 0) > 0 else P.get("x_obsh_g", 0.0)
+            xe2 = P["x_obsh_p_gsc"] if P.get("x_obsh_p_gsc", 0) > 0 else P.get("x_obsh_p", 0.0)
+            lane_specs.append((Lg2, Le2, _split(Lg2, xg2, S2, self.nb), _split(Le2, xe2, S2, self.nb)))
+        lanes = []
         if self.shared_mode:
             sh = _Block()
-            self.lane_g = _Lane(Lg, P["L_path"], pg, sh)
-            self.lane_e = _Lane(Le, P["L_path"], pe, sh)
-            self.blocks = self.lane_g.blocks + [x for x in self.lane_e.blocks if x is not sh]
+            self.blocks = []
+            for lg, le, parts_g, parts_e in lane_specs:
+                g_ln = _Lane(lg, P["L_path"], parts_g, sh)
+                e_ln = _Lane(le, P["L_path"], parts_e, sh)
+                lanes.append((g_ln, e_ln))
+                for ln in (g_ln, e_ln):
+                    for blk in ln.blocks:
+                        if not any(blk is x for x in self.blocks):
+                            self.blocks.append(blk)
         else:
             self.blocks = [_Block() for _ in range(self.nb)]
-            self.lane_g = _Lane(Lg, P["L_path"], pg, None, self.blocks)
-            self.lane_e = _Lane(Le, P["L_path"], pe, None, self.blocks)
-            self.lane_e.parked = self.lane_g.parked
+            parked = [0] * (self.nb + 1)
+            for lg, le, parts_g, parts_e in lane_specs:
+                g_ln = _Lane(lg, P["L_path"], parts_g, None, self.blocks)
+                e_ln = _Lane(le, P["L_path"], parts_e, None, self.blocks)
+                g_ln.parked = parked
+                e_ln.parked = parked
+                lanes.append((g_ln, e_ln))
+        self.lane_g, self.lane_e = lanes[0]
         n_posts = int(P["n_posts"])
-        self.posts = [None] * n_posts
-        self.post_start = [0.0] * n_posts
-        self.post_busy = [0.0] * n_posts
-        self.post_q = []
+        n_posts_g = int(P.get("n_posts_gsc", 3)) if dual else 0
+        self.sys = [_Sys(0, "SLC", lanes[0][0], lanes[0][1], 0, n_posts, P["t_post"])]
+        if dual:
+            self.sys.append(_Sys(1, "GSC", lanes[1][0], lanes[1][1], n_posts, n_posts + n_posts_g, K.gsc_spot_time(P)))
+        total_posts = n_posts + n_posts_g
+        self.posts = [None] * total_posts
+        self.post_start = [0.0] * total_posts
+        self.post_busy = [0.0] * total_posts
+        self.post_names = (["С-20 (АТУ)"] if n_posts == 1 else [("С-14", "С-15")[i] if i < 2 else f"Пост {i + 1}" for i in range(n_posts)]) \
+            + [f"Орт №{26 + i}" if n_posts_g == 3 else f"Пост GSC {i + 1}" for i in range(n_posts_g)]
+        self.sys_unloaded = [0.0, 0.0]
+        self.sys[0].kd = 0
+        if dual:
+            self.sys[1].kd = 1 if int(P.get("kdrv_gsc", 1)) == 1 else 0
         self.loader_cnt = 0
         self.loader_q = []
         self.loader_busy = 0.0
-        self.kdrv = None
-        self.kdrv_q = []
-        self.kdrv_start = 0.0
-        self.kdrv_busy = 0.0
+        self.kdrv = [None, None]
+        self.kdrv_q = [[], []]
+        self.kdrv_start = [0.0, 0.0]
+        self.kdrv_busy = [0.0, 0.0]
         self.loaded_total = 0.0
         self.unloaded_total = 0.0
         self.unload_events = []
@@ -159,6 +211,12 @@ class Engine:
         self.q_loader = [(0.0, 0)]
         self.deadlock = False
         self.locos = [_Loco(i) for i in range(int(P["n_loco"]))]
+        roles = ["SLC"] * fl["slc"] + ["GSC"] * fl["gsc"] + ["резерв"] * fl["rez"] + ["ремонт"] * fl["rem"] \
+            + ["уборка породы"] * fl["por"]
+        for l, r in zip(self.locos, roles):
+            l.role = r
+            l.sys = 1 if r == "GSC" else 0
+            l.idle = r not in ("SLC", "GSC")
 
     # ---------- вспомогательное ----------
     def at(self, t, fn, *args):
@@ -182,12 +240,13 @@ class Engine:
 
     def logq(self):
         t = self.t
-        self.q_post.append((t, len(self.post_q)))
-        self.q_kdrv.append((t, len(self.kdrv_q)))
+        self.q_post.append((t, sum(len(x.post_q) for x in self.sys)))
+        self.q_kdrv.append((t, len(self.kdrv_q[0]) + len(self.kdrv_q[1])))
         self.q_loader.append((t, len(self.loader_q)))
 
     def lane(self, l):
-        return self.lane_g if l.dir == 1 else self.lane_e
+        s = self.sys[l.sys]
+        return s.lane_g if l.dir == 1 else s.lane_e
 
     def pos_x(self, l):
         """Положение состава в координатах L_path (ось гружёного и порожнего пути приведена к одной шкале)."""
@@ -196,11 +255,12 @@ class Engine:
     def set_state(self, l, s):
         t = self.t
         if l.state is not None and t > l.state_t:
-            l.states.append((l.state_t, t, l.state, l.x0, self.pos_x(l), l.loaded, l.post0))
+            l.states.append((l.state_t, t, l.state, l.x0, self.pos_x(l), l.loaded, l.post0, l.lp0))
         l.state = s
         l.state_t = t
         l.x0 = self.pos_x(l)
         l.post0 = l.post if l.post is not None else -1
+        l.lp0 = l.last_post
 
     # ---------- цикл локомотива ----------
     def want_post(self, l):
@@ -212,8 +272,9 @@ class Engine:
                 self.at(ns, self.want_post, l)
             return
         self.set_state(l, "ожидание поста")
-        self.post_q.append(l)
-        self.assign_posts()
+        s = self.sys[l.sys]
+        s.post_q.append(l)
+        self.assign_posts(s)
         self.logq()
 
     def send_off(self, l):
@@ -225,27 +286,34 @@ class Engine:
 
     def window_end(self):
         """Конец окна работы: очередь на посты снимается, начатые циклы завершаются."""
-        q, self.post_q = self.post_q, []
-        for l in q:
-            self.send_off(l)
+        for s in self.sys:
+            q, s.post_q = s.post_q, []
+            for l in q:
+                self.send_off(l)
         self.logq()
 
-    def assign_posts(self):
-        while self.post_q:
-            free = next((i for i, h in enumerate(self.posts) if h is None), None)
+    def assign_posts(self, s):
+        while s.post_q:
+            free = next((i for i in range(s.p0, s.p1) if self.posts[i] is None), None)
             if free is None:
                 break
-            l = self.post_q.pop(0)
+            l = s.post_q.pop(0)
             if not self.in_window(self.t):
                 self.send_off(l)
                 continue
             self.posts[free] = l
             self.post_start[free] = self.t
             l.post = free
+            l.last_post = free - s.p0
             l.wagon = 0
             self.set_state(l, "постановка под погрузку")
-            self.at(self.t + self.P["t_post"], self.spot_wagon, l)
+            self.at(self.t + s.t_spot, self.spot_wagon if s.idx == 0 else self.gsc_load, l)
         self.logq()
+
+    def gsc_load(self, l):
+        """GSC: состав стоит у люка орта, вагоны грузятся скреперной лебёдкой последовательно, ПДМ не нужна."""
+        self.set_state(l, "погрузка")
+        self.at(self.t + K.gsc_load_time(self.P), self.finish_loading, l)
 
     def spot_wagon(self, l):
         self.set_state(l, "подача вагона")
@@ -283,7 +351,7 @@ class Engine:
         self.post_busy[i] += self.overlap(self.post_start[i], self.t)
         self.posts[i] = None
         l.post = None
-        self.assign_posts()
+        self.assign_posts(self.sys[l.sys])
         l.dir = 1
         l.pending = self.loss_a
         self.request_block(l, 0, 0)
@@ -361,40 +429,47 @@ class Engine:
     # ---------- КДРВ ----------
     def want_kdrv(self, l):
         self.set_state(l, "ожидание КДРВ")
-        self.kdrv_q.append(l)
-        self.grant_kdrv()
+        k = self.sys[l.sys].kd
+        self.kdrv_q[k].append(l)
+        self.grant_kdrv(k)
         self.logq()
 
-    def grant_kdrv(self):
-        if self.kdrv is None and self.kdrv_q:
-            l = self.kdrv_q.pop(0)
-            self.kdrv = l
-            self.kdrv_start = self.t
+    def grant_kdrv(self, k):
+        if self.kdrv[k] is None and self.kdrv_q[k]:
+            l = self.kdrv_q[k].pop(0)
+            self.kdrv[k] = l
+            self.kdrv_start[k] = self.t
             self.set_state(l, "разгрузка")
             self.at(self.t + self.P["t_unload"], self.end_unload, l)
             self.logq()
 
     def end_unload(self, l):
         t = self.t
-        self.kdrv_busy += self.overlap(self.kdrv_start, t)
-        self.kdrv = None
+        sy = self.sys[l.sys]
+        k = sy.kd
+        self.kdrv_busy[k] += self.overlap(self.kdrv_start[k], t)
+        self.kdrv[k] = None
         self.unloaded_total += l.cargo
+        self.sys_unloaded[l.sys] += l.cargo
         l.tonnes += l.cargo
         l.cargo = 0.0
         l.loaded = False
         l.trips += 1
         l.marks.append(t)
         self.unload_events.append((t, self.unloaded_total))
-        self.grant_kdrv()
+        self.grant_kdrv(k)
         l.dir = -1
-        l.node = self.lane_e.m
+        l.node = sy.lane_e.m
         l.pending = self.loss_a
-        self.request_block(l, self.lane_e.m - 1, self.lane_e.m)
+        self.request_block(l, sy.lane_e.m - 1, sy.lane_e.m)
 
     # ---------- прогон ----------
     def run(self):
         for l in self.locos:
-            self.at(0.0, self.want_post, l)
+            if l.idle:
+                self.set_state(l, l.role)
+            else:
+                self.at(0.0, self.want_post, l)
         for _, b in self.windows:
             self.at(b, self.window_end)
         drained = True
@@ -415,17 +490,18 @@ class Engine:
                 frac = min(1.0, (self.horizon - l.state_t) / (l.arr_t - l.state_t))
                 x1 = l.x0 + (l.dest_x - l.x0) * frac
             if self.horizon > l.state_t:
-                l.states.append((l.state_t, self.horizon, l.state, l.x0, x1, l.loaded, l.post0))
+                l.states.append((l.state_t, self.horizon, l.state, l.x0, x1, l.loaded, l.post0, l.lp0))
         for j, B in enumerate(self.blocks):
             if B.holder is not None:
                 B.busy += self.overlap(B.occ_start, self.horizon)
         for i, h in enumerate(self.posts):
             if h is not None:
                 self.post_busy[i] += self.overlap(self.post_start[i], self.horizon)
-        if self.kdrv is not None:
-            self.kdrv_busy += self.overlap(self.kdrv_start, self.horizon)
+        for k in range(2):
+            if self.kdrv[k] is not None:
+                self.kdrv_busy[k] += self.overlap(self.kdrv_start[k], self.horizon)
         for l in self.locos:
-            if l.state == "погрузка":
+            if l.state == "погрузка" and l.sys == 0 and not l.idle:
                 self.loader_busy += self.overlap(l.load_t0, self.horizon)
 
 
@@ -456,7 +532,7 @@ def simulate(P, kind="shift", windows=None, horizon=None):
     all_cycles = []
     for l in eng.locos:
         acc = {s: 0.0 for s in STATE_NAMES}
-        for (t0, t1, s, _, _, _, _) in l.states:
+        for (t0, t1, s, _, _, _, _, _) in l.states:
             acc[s] += eng.overlap(t0, t1)
             if s in wait_acc:
                 wait_acc[s].append(t1 - t0)
@@ -467,6 +543,8 @@ def simulate(P, kind="shift", windows=None, horizon=None):
             "id": l.id + 1,
             "trips": l.trips,
             "tonnes": round(l.tonnes, 1),
+            "role": l.role,
+            "system": "—" if l.idle else l.role,
             "util": work / t_sum if t_sum else 0.0,
             "share": {s: (acc[s] / t_sum if t_sum else 0.0) for s in STATE_NAMES if s != "вне работы"},
             "cycle_mean": (sum(cyc) / len(cyc)) if cyc else None,
@@ -478,7 +556,8 @@ def simulate(P, kind="shift", windows=None, horizon=None):
                       "mean": (sum(arr) / len(arr)) if arr else 0.0, "max": max(arr) if arr else 0.0})
 
     in_transit = sum(l.cargo for l in eng.locos)
-    plan_total = eng.P["plan_shift"] * n_shifts
+    pl_slc, pl_gsc, pl_all = K.plans(P)
+    plan_total = pl_all * n_shifts
     tonnes = eng.unloaded_total
     trains = sum(l.trips for l in eng.locos)
 
@@ -494,8 +573,24 @@ def simulate(P, kind="shift", windows=None, horizon=None):
     }
     tracks = []
     for l in eng.locos:
-        tracks.append([[round(a, 1), round(b, 1), STATE_IDX[s], round(x0, 1), round(x1, 1), 1 if ld else 0, pst]
-                       for (a, b, s, x0, x1, ld, pst) in l.states])
+        tracks.append([[round(a, 1), round(b, 1), STATE_IDX[s], round(x0, 1), round(x1, 1), 1 if ld else 0, pst, lp]
+                       for (a, b, s, x0, x1, ld, pst, lp) in l.states])
+
+    act = [p for p in per_loco if p["system"] != "—"]
+    systems = []
+    for sy, pl in zip(eng.sys, (pl_slc, pl_gsc)):
+        mine = [p for p in per_loco if p["system"] == sy.name]
+        tn = eng.sys_unloaded[sy.idx]
+        pt = pl * n_shifts
+        systems.append({
+            "key": sy.name,
+            "name": "SLC (прямая погрузка с АТУ)" if sy.idx == 0 else "GSC (погрузка с ортов 26, 27, 28)",
+            "n_loco": len(mine), "n_posts": sy.p1 - sy.p0,
+            "trains": sum(p["trips"] for p in mine), "tonnes": tn,
+            "plan": pt, "plan_pct": (tn / pt) if pt else 0.0,
+            "q_window": tn / (t_sum / 3600.0) if t_sum else 0.0,
+            "post_busy": [b / t_sum if t_sum else 0.0 for b in eng.post_busy[sy.p0:sy.p1]],
+        })
 
     cyc_an = K.cycle_analytic(P)
     res = {
@@ -507,6 +602,9 @@ def simulate(P, kind="shift", windows=None, horizon=None):
             "t_load_train": K.loading_train_time(P), "cycle_analytic": cyc_an,
             "windows": [[a, b] for a, b in windows], "horizon": hz, "t_eff_sum": t_sum,
             "n_shifts": n_shifts, "plan_total": plan_total,
+            "fleet": eng.fleet, "plan_slc": pl_slc * n_shifts, "plan_gsc": pl_gsc * n_shifts,
+            "t_load_train_gsc": (K.gsc_spot_time(P) + K.gsc_load_time(P)) if eng.fleet["gsc"] > 0 else 0.0,
+            "cycle_analytic_gsc": K.cycle_analytic_gsc(P) if eng.fleet["gsc"] > 0 else 0.0,
         },
         "kpi": {
             "trains": trains,
@@ -514,11 +612,12 @@ def simulate(P, kind="shift", windows=None, horizon=None):
             "plan_pct": (tonnes / plan_total) if plan_total else 0.0,
             "q_horizon": tonnes / (hz / 3600.0),
             "q_window": tonnes / (t_sum / 3600.0) if t_sum else 0.0,
-            "util_mean": (sum(p["util"] for p in per_loco) / len(per_loco)) if per_loco else 0.0,
+            "util_mean": (sum(p["util"] for p in act) / len(act)) if act else 0.0,
             "cycle_mean": (sum(all_cycles) / len(all_cycles)) if all_cycles else None,
             "cycle_min": min(all_cycles) if all_cycles else None,
             "cycle_max": max(all_cycles) if all_cycles else None,
             "trains_needed": (plan_total / (P["n_wagons"] * P["m_wag"])),
+            "systems": systems,
         },
         "locos": per_loco,
         "waits": waits,
@@ -526,7 +625,8 @@ def simulate(P, kind="shift", windows=None, horizon=None):
             "blocks": [B.busy / t_sum if t_sum else 0.0 for B in eng.blocks],
             "posts": [b / t_sum if t_sum else 0.0 for b in eng.post_busy],
             "loader": eng.loader_busy / (t_sum * int(P["n_loader"])) if t_sum else 0.0,
-            "kdrv": eng.kdrv_busy / t_sum if t_sum else 0.0,
+            "kdrv": eng.kdrv_busy[0] / t_sum if t_sum else 0.0,
+            "kdrv_list": [b / t_sum if t_sum else 0.0 for b in eng.kdrv_busy],
             "q_post_max": max(v for _, v in eng.q_post),
             "q_kdrv_max": max(v for _, v in eng.q_kdrv),
             "q_loader_max": max(v for _, v in eng.q_loader),
@@ -546,6 +646,9 @@ def simulate(P, kind="shift", windows=None, horizon=None):
             "L_path": P["L_path"], "n_blocks": eng.lane_g.m,
             "nodes": list(eng.lane_g.eq),
             "n_posts": int(P["n_posts"]),
+            "n_posts_gsc": eng.sys[1].p1 - eng.sys[1].p0 if len(eng.sys) > 1 else 0,
+            "post_names": eng.post_names,
+            "nodes_gsc": list(eng.sys[1].lane_g.eq) if len(eng.sys) > 1 else [],
             "post_xy": [10036, 33512], "kdrv_xy": [8156, 33295],
             "chord_m": math.hypot(10036 - 8156, 33512 - 33295),
         },
@@ -564,20 +667,41 @@ def max_perf(P, tonnes, n_shifts):
     """Максимальная производительность по техническим параметрам, т за смену.
 
     Звено с наименьшей пропускной способностью (scheme) за эффективное время смены:
-    N_макс = min(звенья)·T_эф/3600 составов, Q_макс = N_макс·n·m_в. Расчётный выпуск за смену Q = Q_расч/число смен."""
-    c = scheme(P)["capacity"]
+    N_макс = min(звенья)·T_эф/3600 составов, Q_макс = N_макс·n·m_в. Расчётный выпуск за смену Q = Q_расч/число смен.
+    При двух системах разработки максимум шахты — сумма максимумов SLC и GSC."""
+    sc = scheme(P)
+    c = sc["capacity"]
     m_train = int(P["n_wagons"]) * P["m_wag"]
     t_eff = (P["T_sm"] - P["t_to_start"] - P["t_to_end"]) * P["ktg"]
     low = next(x for x in c["links"] if x["key"] == c["bottleneck"])
     actual = tonnes / n_shifts
-    return {
+    out = {
         "bottleneck": c["bottleneck"], "bottleneck_name": low["name"], "formula": low["formula"],
         "rate_max": c["rate_min"], "t_eff_shift": t_eff, "trains_max": c["trains_ref"],
         "tonnes_max": c["tonnes_ref"], "tonnes_actual": actual,
         "pct_of_max": actual / c["tonnes_ref"] if c["tonnes_ref"] else None,
         "links": [{"key": x["key"], "name": x["name"], "rate": x["rate"], "tonnes_shift": x["rate"] * t_eff / 3600.0 * m_train}
                   for x in c["links"]],
+        "systems": [{"key": x["key"], "name": x["name"], "bottleneck": x["bottleneck"],
+                     "bottleneck_name": x["bottleneck_name"], "formula": x["formula"],
+                     "rate_max": x["rate_min"], "trains_max": x["trains_ref"], "tonnes_max": x["tonnes_ref"],
+                     "links": [{"key": y["key"], "name": y["name"], "rate": y["rate"],
+                                "tonnes_shift": y["rate"] * t_eff / 3600.0 * m_train} for y in x["links"]]}
+                    for x in c["systems"]],
     }
+    return out
+
+
+def _track_occ(P, Lg, Le, S, xg, xe, nb, Lp, v):
+    """Занятость блока-участка за цикл: общий блок проходят оба состава, свободный блок — один."""
+    if S > 0:
+        pg = _split(Lg, xg, S, nb)
+        pe = _split(Le, xe, S, nb)
+        free_max = max([x for x, sh in pg + pe if not sh] or [0.0])
+        return max(2.0 * (S + Lp) / v, (free_max + Lp) / v), (S + Lp) / v, pg
+    Lb = P["L_path"] / nb
+    t_occ = (Lb + Lp) / v
+    return 2.0 * t_occ, t_occ, None
 
 
 def scheme(P):
@@ -591,6 +715,7 @@ def scheme(P):
     N_ор = min(звенья)·T_эф/3600. Это не строгая верхняя граница: составы, уже стоящие на постах
     в конце окна, дозагружаются после него, поэтому имитация может дать до n_пост составов больше
     ориентира; ниже ориентира имитация бывает из-за пуска первого цикла и ожиданий.
+    Для GSC звенья те же, но посты — орты 26–28 (n_пост·3600/(t_пос + n·t_в)), ПДМ не участвует.
     """
     v = K.speed_ms(P["v_kmh"], P["k_v"])
     nb = int(P["n_blocks"])
@@ -604,18 +729,12 @@ def scheme(P):
     cyc = K.cycle_analytic(P)
     m_train = n * P["m_wag"]
     t_eff = (P["T_sm"] - P["t_to_start"] - P["t_to_end"]) * P["ktg"]
-    # занятость блока за цикл: общий блок проходят оба состава, свободный блок — один
-    if S > 0:
-        pg = _split(Lg, P.get("x_obsh_g", 0.0), S, nb)
-        pe = _split(Le, P.get("x_obsh_p", 0.0), S, nb)
-        free_max = max([x for x, sh in pg + pe if not sh] or [0.0])
-        t_cyc_occ = max(2.0 * (S + Lp) / v, (free_max + Lp) / v)
-        t_occ = (S + Lp) / v
-    else:
-        t_occ = (Lb + Lp) / v
-        t_cyc_occ = 2.0 * t_occ
+    fl = K.fleet(P)
+    dual = fl["gsc"] > 0
+    pl_slc, pl_gsc, pl_all = K.plans(P)
+    t_cyc_occ, t_occ, pg = _track_occ(P, Lg, Le, S, P.get("x_obsh_g", 0.0), P.get("x_obsh_p", 0.0), nb, Lp, v)
     links = [
-        {"key": "locos", "name": "Электровозы Ferrit", "rate": P["n_loco"] * 3600.0 / cyc,
+        {"key": "locos", "name": "Электровозы Ferrit", "rate": fl["slc"] * 3600.0 / cyc,
          "formula": "n_ЭВ · 3600 / t_ц"},
         {"key": "posts", "name": "Пост прямой погрузки с АТУ (С-20)" if int(P["n_posts"]) == 1 else "Посты погрузки С-14, С-15", "rate": P["n_posts"] * 3600.0 / t_load,
          "formula": "n_пост · 3600 / t_погр.сост"},
@@ -626,9 +745,34 @@ def scheme(P):
         {"key": "track", "name": "Блок-участок (два прохода за цикл)", "rate": 3600.0 / t_cyc_occ,
          "formula": "3600 / (2 · (L_общ + L_п) / v)" if S > 0 else "3600 / (2 · (L_б + L_п) / v)"},
     ]
-    low = min(links, key=lambda x: x["rate"])
-    rate_min = low["rate"]
-    trains_ref = rate_min * t_eff / 3600.0
+
+    def pack(key, name, lk):
+        low_ = min(lk, key=lambda x: x["rate"])
+        tr = low_["rate"] * t_eff / 3600.0
+        return {"key": key, "name": name, "links": lk, "bottleneck": low_["key"], "bottleneck_name": low_["name"],
+                "formula": low_["formula"], "rate_min": low_["rate"], "trains_ref": tr, "tonnes_ref": tr * m_train}
+
+    systems = [pack("SLC", "SLC (прямая погрузка с АТУ)", links)]
+    if dual:
+        Lg2, Le2, S2 = K.lanes_gsc(P)
+        c2, _, _ = _track_occ(P, Lg2, Le2, S2, P.get("x_obsh_g_gsc", 0.0) or P.get("x_obsh_g", 0.0),
+                              P.get("x_obsh_p_gsc", 0.0) or P.get("x_obsh_p", 0.0), nb, Lp, v)
+        t_load2 = K.gsc_spot_time(P) + K.gsc_load_time(P)
+        links2 = [
+            {"key": "locos", "name": "Электровозы Ferrit (GSC)", "rate": fl["gsc"] * 3600.0 / K.cycle_analytic_gsc(P),
+             "formula": "n_ЭВ,GSC · 3600 / t_ц"},
+            {"key": "posts", "name": "Орты 26, 27, 28 (скреперные лебёдки)", "rate": P["n_posts_gsc"] * 3600.0 / t_load2,
+             "formula": "n_пост · 3600 / (t_пос + n · t_в)"},
+            {"key": "kdrv", "name": "КДРВ №1" if int(P["kdrv_gsc"]) == 1 else "КДРВ №2 (общий)", "rate": 3600.0 / P["t_unload"],
+             "formula": "3600 / t_разгр"},
+            {"key": "track", "name": "Блок-участок (два прохода за цикл)", "rate": 3600.0 / c2,
+             "formula": "3600 / (2 · (L_общ + L_п) / v)" if S2 > 0 else "3600 / (2 · (L_б + L_п) / v)"},
+        ]
+        systems.append(pack("GSC", "GSC (погрузка с ортов 26, 27, 28)", links2))
+    s0 = systems[0]
+    low = next(x for x in links if x["key"] == s0["bottleneck"])
+    tonnes_ref = sum(x["tonnes_ref"] for x in systems)
+    trains_ref = sum(x["trains_ref"] for x in systems)
     return {
         "params": P,
         "geometry": {
@@ -637,6 +781,8 @@ def scheme(P):
             "nodes": ([x * P["L_path"] / Lg for x in _pos(pg)] if S > 0 else [i * Lb for i in range(nb + 1)]),
             "L_train": Lp, "L_razm": P["L_razm"], "cap_loop": cap,
             "n_posts": int(P["n_posts"]),
+            "gsc": ({"L_gruz": K.lanes_gsc(P)[0], "L_por": K.lanes_gsc(P)[1], "L_obsh": K.lanes_gsc(P)[2],
+                     "n_posts": int(P["n_posts_gsc"])} if dual else None),
             "post_xy": [10036, 33512], "kdrv_xy": [8156, 33295],
             "chord_m": math.hypot(10036 - 8156, 33512 - 33295),
         },
@@ -650,11 +796,12 @@ def scheme(P):
             "cycle_analytic": cyc, "t_eff_shift": t_eff, "m_train": m_train,
         },
         "capacity": {
-            "links": links, "bottleneck": low["key"], "rate_min": rate_min,
-            "required_rate": P["plan_shift"] / (m_train * t_eff / 3600.0) if t_eff > 0 else None,
-            "trains_ref": trains_ref, "tonnes_ref": trains_ref * m_train,
-            "tail_trains": int(P["n_posts"]),
-            "plan_shift": P["plan_shift"],
-            "plan_pct_ref": (trains_ref * m_train / P["plan_shift"]) if P["plan_shift"] else None,
+            "links": links, "bottleneck": s0["bottleneck"], "rate_min": s0["rate_min"],
+            "required_rate": pl_all / (m_train * t_eff / 3600.0) if t_eff > 0 else None,
+            "trains_ref": trains_ref, "tonnes_ref": tonnes_ref,
+            "tail_trains": int(P["n_posts"]) + (int(P["n_posts_gsc"]) if dual else 0),
+            "plan_shift": pl_all,
+            "plan_pct_ref": (tonnes_ref / pl_all) if pl_all else None,
+            "systems": systems,
         },
     }

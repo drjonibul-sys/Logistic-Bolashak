@@ -25,6 +25,7 @@ sys.path.insert(0, BASE)
 
 from sim import VERSION, params as PR, blocks as BL  # noqa: E402
 from sim.engine import scheme, simulate  # noqa: E402
+from sim import kinematics as KIN  # noqa: E402
 
 DATA_DIR = os.environ.get("LOGISTIKA_DATA", os.path.join(BASE, "data"))
 STATIC_DIR = os.path.join(BASE, "static")
@@ -32,6 +33,7 @@ REF_FILE = os.path.join(DATA_DIR, "reference.json")
 ADMIN_FILE = os.path.join(DATA_DIR, "admin.json")
 LAST_FILE = os.path.join(DATA_DIR, "last_run.json")
 BLOCKS_FILE = os.path.join(DATA_DIR, "blocks.json")
+FLEET_FILE = os.path.join(DATA_DIR, "fleet.json")
 
 PBKDF2_ITER = int(os.environ.get("LOGISTIKA_PBKDF2_ITER", "600000"))
 MIN_PASSWORD = 12
@@ -103,11 +105,56 @@ def reference_values():
     if ln:
         # значения блока −480 действуют, пока их не задали вручную в справочнике
         mine = {"L_gruz": ln["Lg"], "L_por": ln["Le"], "L_obsh": ln["S"], "x_obsh_g": ln["xg"], "x_obsh_p": ln["xe"], "n_posts": int(round(ln["posts"]))}
+        gs = ln.get("gsc")
+        if gs:  # две системы разработки: GSC (орты 26, 27, 28), планы систем и распределение парка электровозов
+            mine.update({
+                "L_gruz_gsc": gs["Lg"], "L_por_gsc": gs["Le"], "x_obsh_g_gsc": gs["xg"], "x_obsh_p_gsc": gs["xe"],
+                "n_posts_gsc": int(round(gs["posts"])), "plan_slc": ln["plan"]["slc"], "plan_gsc": ln["plan"]["gsc"],
+                "n_loco_gsc": int(round(ln["fleet"]["gsc"])), "n_loco_rez": int(round(ln["fleet"]["rez"])),
+                "n_loco_rem": int(round(ln["fleet"]["rem"])), "n_loco_por": int(round(ln["fleet"]["por"])),
+            })
         for k, v in mine.items():
             if not (isinstance(over, dict) and k in over):
                 vals[k] = v
+    fl = _read_json(FLEET_FILE, None)
+    if isinstance(fl, dict) and isinstance(fl.get("roles"), list) and fl["roles"]:
+        # ручное распределение электровозов по ролям и планы систем (страница «Электровозы») действуют поверх справочника
+        cnt = {r: fl["roles"].count(r) for r in FLEET_ROLES}
+        vals.update({"n_loco": len(fl["roles"]), "n_loco_gsc": cnt["GSC"], "n_loco_rez": cnt["rez"],
+                     "n_loco_rem": cnt["rem"], "n_loco_por": cnt["por"]})
+        for k in ("plan_slc", "plan_gsc"):
+            if k in fl:
+                vals[k] = fl[k]
     clean, errors = PR.validate(vals)
     return clean if not errors else PR.defaults()
+
+
+FLEET_ROLES = ("SLC", "GSC", "rez", "rem", "por")
+
+
+def fleet_view():
+    """Роли электровозов по очереди (SLC, GSC, резерв, ремонт, порода) и планы систем, как они действуют в расчёте."""
+    v = reference_values()
+    f = KIN.fleet(v)
+    roles = ["SLC"] * f["slc"] + ["GSC"] * f["gsc"] + ["rez"] * f["rez"] + ["rem"] * f["rem"] + ["por"] * f["por"]
+    slc, gsc, _ = KIN.plans(v)
+    return {"roles": roles, "plan_slc": slc, "plan_gsc": gsc, "custom": os.path.isfile(FLEET_FILE)}
+
+
+def fleet_clean(data):
+    roles = data.get("roles")
+    if not isinstance(roles, list) or not 1 <= len(roles) <= 30 or any(r not in FLEET_ROLES for r in roles):
+        return None, "Роли электровозов: от 1 до 30 значений SLC, GSC, rez, rem, por"
+    out = {"roles": sorted(roles, key=FLEET_ROLES.index)}
+    for k in ("plan_slc", "plan_gsc"):
+        try:
+            x = float(data.get(k, 0))
+        except (TypeError, ValueError):
+            return None, "План: не число"
+        if x != x or x < 0 or x > 20000:
+            return None, "План: допустимо от 0 до 20000 т"
+        out[k] = x
+    return out, None
 
 
 def last_record():
@@ -265,6 +312,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, {"groups": PR.GROUPS, "values": reference_values(), "defaults": PR.defaults()})
         if path == "/api/blocks":
             return self._send(200, {"blocks": blocks_values()["blocks"], "defaults": BL.defaults()["blocks"]})
+        if path == "/api/fleet":
+            return self._send(200, fleet_view())
         if path == "/api/scheme":
             return self._send(200, scheme(reference_values()))
         if path == "/api/last":
@@ -369,6 +418,21 @@ class Handler(BaseHTTPRequestHandler):
             with LOCK:
                 _write_json(REF_FILE, clean)
             return self._send(200, {"ok": True, "values": clean})
+        # распределение электровозов по ролям и планы систем правят все пользователи
+        if method == "PUT" and path == "/api/fleet":
+            clean, err = fleet_clean(data)
+            if err:
+                return self._err(422, err)
+            with LOCK:
+                _write_json(FLEET_FILE, clean)
+            return self._send(200, dict(fleet_view(), ok=True))
+        if method == "POST" and path == "/api/fleet/reset":
+            with LOCK:
+                try:
+                    os.remove(FLEET_FILE)
+                except OSError:
+                    pass
+            return self._send(200, dict(fleet_view(), ok=True))
         if method == "POST" and path == "/api/reference/reset":
             with LOCK:
                 try:

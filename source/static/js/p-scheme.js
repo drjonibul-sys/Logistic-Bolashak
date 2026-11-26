@@ -53,17 +53,24 @@ function renderTables() {
     row('Окно работы за смену T_эф, ч', fmt(tm.t_eff_shift / 3600, 2));
 
   let c = '<tr><th>Звено</th><th class="l">Формула</th><th>Составов/ч</th><th>Выпуск за смену при этом звене, т</th><th>К плану</th></tr>';
-  cap.links.forEach(l => {
-    const t = l.rate * tm.t_eff_shift / 3600 * tm.m_train;
-    const low = l.key === cap.bottleneck;
-    c += `<tr${low ? ' class="hl"' : ''}><td>${esc(l.name)}${low ? '<span class="badge">узкое место</span>' : ''}</td>` +
-      `<td class="l">${esc(l.formula)}</td><td>${fmt(l.rate, 2)}</td><td>${fmt(t, 0)}</td><td>${pct(t / cap.plan_shift)}</td></tr>`;
+  const dual = cap.systems && cap.systems.length > 1;
+  const plans = dual ? [SCH.params.plan_slc, SCH.params.plan_gsc] : [cap.plan_shift];
+  (cap.systems || []).forEach((sy, i) => {
+    if (dual) c += `<tr><th class="l" colspan="5">${esc(sy.name)}: план ${fmt(plans[i], 0)} т за смену</th></tr>`;
+    sy.links.forEach(l => {
+      const t = l.rate * tm.t_eff_shift / 3600 * tm.m_train;
+      const low = l.key === sy.bottleneck;
+      c += `<tr${low ? ' class="hl"' : ''}><td>${esc(l.name)}${low ? '<span class="badge">узкое место</span>' : ''}</td>` +
+        `<td class="l">${esc(l.formula)}</td><td>${fmt(l.rate, 2)}</td><td>${fmt(t, 0)}</td><td>${plans[i] ? pct(t / plans[i]) : '—'}</td></tr>`;
+    });
   });
   $('#tblCap').innerHTML = c;
   const low = cap.links.find(l => l.key === cap.bottleneck);
-  $('#capText').textContent =
-    `Узкое место: «${low.name}», ${fmt(cap.rate_min, 2)} составов/ч. Для плана ${fmt(cap.plan_shift, 0)} т за смену нужно ${fmt(cap.required_rate, 2)} составов/ч. ` +
-    `Ориентир выпуска за смену: ${fmt(cap.trains_ref, 1)} составов (${fmt(cap.tonnes_ref, 0)} т, ${pct(cap.plan_pct_ref)} плана).`;
+  $('#capText').textContent = dual
+    ? 'Максимум шахты за смену — сумма максимумов систем: ' + cap.systems.map(sy => `${sy.key} ${fmt(sy.tonnes_ref, 0)} т (лимит: «${sy.bottleneck_name}», ${fmt(sy.rate_min, 2)} составов/ч)`).join(' + ') +
+      ` = ${fmt(cap.tonnes_ref, 0)} т, ${pct(cap.plan_pct_ref)} общего плана ${fmt(cap.plan_shift, 0)} т. Для общего плана нужно ${fmt(cap.required_rate, 2)} составов/ч по шахте.`
+    : `Узкое место: «${low.name}», ${fmt(cap.rate_min, 2)} составов/ч. Для плана ${fmt(cap.plan_shift, 0)} т за смену нужно ${fmt(cap.required_rate, 2)} составов/ч. ` +
+      `Ориентир выпуска за смену: ${fmt(cap.trains_ref, 1)} составов (${fmt(cap.tonnes_ref, 0)} т, ${pct(cap.plan_pct_ref)} плана).`;
   $('#schemeNote').textContent =
     (geo.L_obsh > 0
       ? `Гружёный и порожний составы идут по раздельным блок-участкам: гружёный путь ${fmt(geo.L_gruz, 0)} м, порожний ${fmt(geo.L_por, 0)} м. Общий однопутный участок (грузовой квершлаг №1) ${fmt(geo.L_obsh, 0)} м: конфликт и приоритет гружёных работают только на нём. Разминовки на промежуточных узлах. `

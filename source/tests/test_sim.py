@@ -273,3 +273,54 @@ class TestSharedLanes(unittest.TestCase):
                 if names[s[2]] in ("стоянка на разминовке", "ожидание блок-участка", "ожидание в выработке"):
                     w[s[5]] += s[1] - s[0]
         self.assertLessEqual(w[0], w[1] + 1e-6)
+
+
+class TestDualSystems(unittest.TestCase):
+    """SLC (прямая погрузка с АТУ) и GSC (орты 26, 27, 28): роли электровозов, планы, посты (версия 0.16.0)."""
+
+    DUAL = dict(PR.defaults(), L_path=3133.0, L_gruz=2076.1, L_por=4190.3, L_obsh=756.2, x_obsh_g=677.5, x_obsh_p=2825.5,
+                n_posts=1, plan_slc=1200.0, plan_gsc=1680.0, n_loco=9, n_loco_gsc=4, n_loco_rez=1, n_loco_rem=1,
+                L_gruz_gsc=3242.3, L_por_gsc=4174.7, x_obsh_g_gsc=1727.8, x_obsh_p_gsc=2753.1)
+
+    def test_fleet_roles(self):
+        from sim import kinematics as K
+        self.assertEqual(K.fleet(self.DUAL), {"gsc": 4, "rez": 1, "rem": 1, "por": 0, "slc": 3})
+        r = simulate(self.DUAL, "shift")
+        self.assertEqual([x["system"] for x in r["locos"]], ["SLC"] * 3 + ["GSC"] * 4 + ["—", "—"])
+        self.assertEqual([x["role"] for x in r["locos"][7:]], ["резерв", "ремонт"])
+        for x in r["locos"][7:]:
+            self.assertEqual((x["trips"], x["util"]), (0, 0.0))
+
+    def test_plans_sum_and_systems(self):
+        r = simulate(self.DUAL, "shift")
+        self.assertEqual(r["derived"]["plan_total"], 2880.0)
+        s = r["kpi"]["systems"]
+        self.assertAlmostEqual(s[0]["tonnes"] + s[1]["tonnes"], r["kpi"]["tonnes"], 6)
+        self.assertAlmostEqual(s[0]["plan"] + s[1]["plan"], r["derived"]["plan_total"], 6)
+        self.assertEqual(s[0]["trains"] + s[1]["trains"], r["kpi"]["trains"])
+        self.assertAlmostEqual(r["checks"]["balance_diff"], 0.0, 6)
+        self.assertFalse(r["checks"]["deadlock"])
+        self.assertEqual(r["route"]["post_names"], ["С-20 (АТУ)", "Орт №26", "Орт №27", "Орт №28"])
+        self.assertEqual(simulate(self.DUAL, "day")["derived"]["plan_total"], 5760.0)
+
+    def test_gsc_cycle_and_no_loader(self):
+        p = dict(self.DUAL, n_loco=1, n_loco_gsc=1, n_loco_rez=0, n_loco_rem=0)
+        r = simulate(p, "shift")
+        self.assertEqual(r["kpi"]["systems"][0]["trains"], 0)
+        self.assertAlmostEqual(r["kpi"]["cycle_mean"], r["derived"]["cycle_analytic_gsc"], 6)
+        self.assertEqual(r["resources"]["loader"], 0.0)
+        p3 = dict(p, n_loco=3, n_loco_gsc=3)
+        self.assertGreaterEqual(simulate(p3, "shift")["kpi"]["systems"][1]["trains"], 2.2 * r["kpi"]["systems"][1]["trains"])
+
+    def test_capacity_adds_up(self):
+        sc = scheme(self.DUAL)
+        c = sc["capacity"]
+        self.assertAlmostEqual(c["tonnes_ref"], sum(x["tonnes_ref"] for x in c["systems"]), 6)
+        self.assertEqual(c["plan_shift"], 2880.0)
+        self.assertEqual(len(scheme(dict(self.DUAL, n_loco_gsc=0))["capacity"]["systems"]), 1)
+
+    def test_legacy_unchanged(self):
+        d = PR.defaults()
+        r = simulate(d, "shift")
+        self.assertEqual(len(r["kpi"]["systems"]), 1)
+        self.assertEqual(r["derived"]["plan_total"], d["plan_shift"])
