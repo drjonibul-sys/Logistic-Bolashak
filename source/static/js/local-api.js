@@ -264,7 +264,11 @@
       if (!data.values || typeof data.values !== 'object') throw fail(400, 'Нет значений справочника');
       const v = LG.validate(data.values);
       if (v.errors.length) throw fail(422, v.errors.join('; '));
-      store.set('reference', v.clean);
+      // сохраняем только отличия от умолчаний, чтобы значения блоков (геометрия АТУ) не замораживались
+      const dfl = LG.defaults(), diff = {};
+      const ed = new Set(Array.isArray(data.edited) ? data.edited : []);
+      Object.keys(v.clean).forEach(k => { if (v.clean[k] !== dfl[k] || ed.has(k)) diff[k] = v.clean[k]; });
+      store.set('reference', diff);
       return { ok: true, values: v.clean };
     }
     // распределение электровозов по ролям и планы систем правят все пользователи

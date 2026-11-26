@@ -417,8 +417,12 @@ class Handler(BaseHTTPRequestHandler):
             clean, errors = PR.validate(vals)
             if errors:
                 return self._err(422, "; ".join(errors))
+            # в файл попадают только отличия от умолчаний: иначе значения блоков (геометрия АТУ) замораживаются
+            dflt = PR.defaults()
+            edited = set(data.get("edited") or [])
+            diff = {k: v for k, v in clean.items() if v != dflt.get(k) or k in edited}
             with LOCK:
-                _write_json(REF_FILE, clean)
+                _write_json(REF_FILE, diff)
             return self._send(200, {"ok": True, "values": clean})
         # распределение электровозов по ролям и планы систем правят все пользователи
         if method == "PUT" and path == "/api/fleet":

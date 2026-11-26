@@ -64,10 +64,14 @@ function applyRefRole() {
 
 async function saveRef() {
   const values = {};
-  $$('#refBox input').forEach(i => { values[i.dataset.key] = parseFloat(i.value); });
+  const edited = [];
+  $$('#refBox input').forEach(i => {
+    values[i.dataset.key] = parseFloat(i.value);
+    if (differs(i.value, i.dataset.saved)) edited.push(i.dataset.key);
+  });
   const msg = $('#refMsg');
   try {
-    await api('PUT', '/api/reference', { values });
+    await api('PUT', '/api/reference', { values, edited });
     await loadRef();
     renderRef();
     setMsg(msg, 'Сохранено. Выполните новый расчёт на странице «Электровозы» или «ПДМ и самосвалы».', 'ok');

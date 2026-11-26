@@ -113,7 +113,7 @@ def _lane_parts(P, nb):
     Lg, Le, S = K.lanes(P)
     fl = K.fleet(P)
     dual = fl["gsc"] > 0
-    zn = K.zone_atu(P) if dual else None
+    zn = K.zone_atu(P)
     tr = K.trunk_atu(P) if dual else None
     xg, xe = P.get("x_obsh_g", 0.0), P.get("x_obsh_p", 0.0)
     Lb = P["L_path"] / nb
@@ -238,7 +238,7 @@ class Engine:
         fl = K.fleet(P)
         self.fleet = fl
         dual = fl["gsc"] > 0
-        zn = K.zone_atu(P) if dual else None
+        zn = K.zone_atu(P)
         pg, pe, pg2, pe2 = _lane_parts(P, self.nb)
         self.Lp = K.train_length(P["L_loco"], int(P["n_wagons"]), P["L_wag"])
         self.cap_loop = K.loop_capacity(P["L_razm"], self.Lp, P["L_zap"])
@@ -273,7 +273,7 @@ class Engine:
                 e_ln.parked = parked
                 lanes.append((g_ln, e_ln))
         self.lane_g, self.lane_e = lanes[0]
-        n_posts = int(P["n_posts"])
+        n_posts = K.slc_posts(P)
         n_posts_g = int(P.get("n_posts_gsc", 3)) if dual else 0
         self.sys = [_Sys(0, "SLC", lanes[0][0], lanes[0][1], 0, n_posts, P["t_post"])]
         if dual:
@@ -752,7 +752,7 @@ def simulate(P, kind="shift", windows=None, horizon=None):
         "route": {
             "L_path": P["L_path"], "n_blocks": eng.lane_g.m,
             "nodes": list(eng.lane_g.eq),
-            "n_posts": int(P["n_posts"]),
+            "n_posts": K.slc_posts(P),
             "n_posts_gsc": eng.sys[1].p1 - eng.sys[1].p0 if len(eng.sys) > 1 else 0,
             "post_names": eng.post_names,
             "nodes_gsc": list(eng.sys[1].lane_g.eq) if len(eng.sys) > 1 else [],
@@ -839,14 +839,15 @@ def scheme(P):
     fl = K.fleet(P)
     dual = fl["gsc"] > 0
     pl_slc, pl_gsc, pl_all = K.plans(P)
-    zn = K.zone_atu(P) if dual else None
+    zn = K.zone_atu(P)
     tr = K.trunk_atu(P) if dual else None
+    n_slc_posts = K.slc_posts(P)
     pgz, pez, pg2, pe2 = _lane_parts(P, nb)
     t_cyc_occ, t_occ, pg = _track_occ(P, Lg, Le, S, P.get("x_obsh_g", 0.0), P.get("x_obsh_p", 0.0), nb, Lp, v, pgz, pez)
     links = [
         {"key": "locos", "name": "Электровозы Ferrit", "rate": fl["slc"] * 3600.0 / cyc,
          "formula": "n_ЭВ · 3600 / t_ц"},
-        {"key": "posts", "name": "Пост прямой погрузки с АТУ (С-20)" if int(P["n_posts"]) == 1 else "Посты погрузки С-14, С-15", "rate": P["n_posts"] * 3600.0 / t_load,
+        {"key": "posts", "name": "Пост прямой погрузки с АТУ (С-20)" if n_slc_posts == 1 else "Посты погрузки С-14, С-15", "rate": n_slc_posts * 3600.0 / t_load,
          "formula": "n_пост · 3600 / t_погр.сост"},
         {"key": "loader", "name": "ПДМ ST1030 №2", "rate": P["n_loader"] * 3600.0 / (n * K.wagon_load_time(P)),
          "formula": "n_ПДМ · 3600 / (n · t_ПДМ)"},
@@ -907,6 +908,12 @@ def scheme(P):
             zone = {"t_slc": t_za_s, "t_gsc": t_za_g, "share_gsc": share_g, "L": zn[2], "L_e": zn[0], "L_g": zn[1], "x_gsc": zn[3]}
         if tr:
             zone = dict(zone or {}, trunk={"et_a": tr[0], "et_b": tr[1], "lt2": tr[2], "rate": r_trunk})
+    if zn and not dual:
+        # без GSC участок занимает только состав SLC от входа до выхода с поста
+        t_za_s = 2.0 * la + lb + (zn[0] + zn[1] + Lp) / v + t_load
+        links.append({"key": "zone", "name": "Однопутный участок у С-20 (пост АТУ)", "rate": 3600.0 / t_za_s,
+                      "formula": "3600 / t_зан,SLC,  t_зан,SLC = 2a + b + (L_уч,п + L_уч,гр + L_п)/v + t_погр.сост"})
+        zone = {"t_slc": t_za_s, "t_gsc": 0.0, "share_gsc": 0.0, "L": zn[2], "L_e": zn[0], "L_g": zn[1], "x_gsc": zn[3]}
     systems.append(pack("SLC", "SLC (прямая погрузка с АТУ)", links))
     if dual:
         systems.append(gsc_pack)
@@ -921,7 +928,7 @@ def scheme(P):
             "L_gruz": Lg, "L_por": Le, "L_obsh": S,
             "nodes": ([x * P["L_path"] / Lg for x in _pos(pg)] if S > 0 else [i * Lb for i in range(nb + 1)]),
             "L_train": Lp, "L_razm": P["L_razm"], "cap_loop": cap,
-            "n_posts": int(P["n_posts"]),
+            "n_posts": n_slc_posts,
             "gsc": ({"L_gruz": K.lanes_gsc(P)[0], "L_por": K.lanes_gsc(P)[1], "L_obsh": K.lanes_gsc(P)[2],
                      "n_posts": int(P["n_posts_gsc"])} if dual else None),
             "post_xy": [10036, 33512], "kdrv_xy": [8156, 33295],
@@ -940,7 +947,7 @@ def scheme(P):
             "links": links, "bottleneck": s0["bottleneck"], "rate_min": s0["rate_min"],
             "required_rate": pl_all / (m_train * t_eff / 3600.0) if t_eff > 0 else None,
             "trains_ref": trains_ref, "tonnes_ref": tonnes_ref,
-            "tail_trains": int(P["n_posts"]) + (int(P["n_posts_gsc"]) if dual else 0),
+            "tail_trains": n_slc_posts + (int(P["n_posts_gsc"]) if dual else 0),
             "plan_shift": pl_all,
             "plan_pct_ref": (tonnes_ref / pl_all) if pl_all else None,
             "systems": systems,

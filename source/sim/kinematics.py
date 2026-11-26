@@ -181,14 +181,20 @@ def cycle_analytic_gsc(p: dict) -> float:
 def zone_atu(p: dict):
     """Однопутный участок у С-20: (часть порожнего пути SLC, часть гружёного пути SLC, длина для GSC, вход на гружёном пути GSC).
 
-    Участок действует при двух системах, общем участке, одном посте SLC (прямая погрузка с АТУ) и всех четырёх
-    длинах больше нуля; иначе None и движение считается как раньше."""
+    Участок действует, когда заданы части SLC, есть общий участок и (при GSC) длина проезда и вход GSC. Пока на посту С-20
+    грузится состав, другие составы на участок не входят и в нём не грузятся, поэтому пост один (см. slc_posts).
+    Иначе None и движение считается как раньше."""
     ze, zg, lz, xz = p.get("L_atu_e", 0.0), p.get("L_atu_g", 0.0), p.get("L_atu", 0.0), p.get("x_atu_gsc", 0.0)
-    if not (ze > 0 and zg > 0 and lz > 0 and xz > 0):
+    if not (ze > 0 and zg > 0) or lanes(p)[2] <= 0:
         return None
-    if int(p["n_posts"]) != 1 or fleet(p)["gsc"] <= 0 or lanes(p)[2] <= 0:
+    if fleet(p)["gsc"] > 0 and not (lz > 0 and xz > 0):
         return None
     return ze, zg, lz, xz
+
+
+def slc_posts(p: dict) -> int:
+    """Число постов SLC: при однопутном участке у С-20 грузится один состав (запрет погрузки и движения других составов)."""
+    return 1 if zone_atu(p) is not None else int(p["n_posts"])
 
 
 def trunk_atu(p: dict):
@@ -196,7 +202,7 @@ def trunk_atu(p: dict):
 
     Действуют только вместе с однопутным участком у С-20; нужны все три длины больше нуля."""
     et_a, et_b, lt2 = p.get("L_et_a", 0.0), p.get("L_et_b", 0.0), p.get("L_lt2", 0.0)
-    if not (et_a > 0 and et_b > 0 and lt2 > 0) or zone_atu(p) is None:
+    if not (et_a > 0 and et_b > 0 and lt2 > 0) or zone_atu(p) is None or fleet(p)["gsc"] <= 0:
         return None
     return et_a, et_b, lt2
 

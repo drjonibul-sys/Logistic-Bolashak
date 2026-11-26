@@ -97,14 +97,16 @@
     /* однопутный участок у С-20: [порожний путь SLC, гружёный путь SLC, длина для GSC, вход на гружёном пути GSC] или null */
     zoneAtu(p) {
       const ze = p.L_atu_e || 0, zg = p.L_atu_g || 0, lz = p.L_atu || 0, xz = p.x_atu_gsc || 0;
-      if (!(ze > 0 && zg > 0 && lz > 0 && xz > 0)) return null;
-      if (Math.trunc(p.n_posts) !== 1 || K.fleet(p).gsc <= 0 || K.lanes(p)[2] <= 0) return null;
+      if (!(ze > 0 && zg > 0) || K.lanes(p)[2] <= 0) return null;
+      if (K.fleet(p).gsc > 0 && !(lz > 0 && xz > 0)) return null;
       return [ze, zg, lz, xz];
     },
+    /* число постов SLC: при однопутном участке у С-20 грузится один состав */
+    slcPosts: p => K.zoneAtu(p) !== null ? 1 : Math.trunc(p.n_posts),
     /* общие одноколейные перегоны SLC и GSC: [порожние за грузовым квершлагом, порожние до него, гружёные после него] или null */
     trunkAtu(p) {
       const ea = p.L_et_a || 0, eb = p.L_et_b || 0, lt = p.L_lt2 || 0;
-      if (!(ea > 0 && eb > 0 && lt > 0) || K.zoneAtu(p) === null) return null;
+      if (!(ea > 0 && eb > 0 && lt > 0) || K.zoneAtu(p) === null || K.fleet(p).gsc <= 0) return null;
       return [ea, eb, lt];
     },
     cycleAnalyticGsc(p) {
@@ -225,7 +227,7 @@
   function laneParts(P, nb) {
     const l0 = K.lanes(P), Lg = l0[0], Le = l0[1], S = l0[2];
     const dual = K.fleet(P).gsc > 0;
-    const zn = dual ? K.zoneAtu(P) : null, tr = dual ? K.trunkAtu(P) : null;
+    const zn = K.zoneAtu(P), tr = dual ? K.trunkAtu(P) : null;
     const xg = P.x_obsh_g || 0, xe = P.x_obsh_p || 0, Lb = P.L_path / nb;
     const ns = x => Math.max(1, Math.floor(x / Lb + 0.5));
     let pg, pe;
@@ -294,7 +296,7 @@
       const fl = K.fleet(P);
       this.fleet = fl;
       const dual = fl.gsc > 0;
-      const zn = dual ? K.zoneAtu(P) : null;
+      const zn = K.zoneAtu(P);
       const lp4 = laneParts(P, this.nb), pg = lp4[0], pe = lp4[1];
       this.Lp = K.trainLength(P.L_loco, Math.trunc(P.n_wagons), P.L_wag);
       this.capLoop = K.loopCapacity(P.L_razm, this.Lp, P.L_zap);
@@ -327,7 +329,7 @@
         });
       }
       this.laneG = lanes[0][0]; this.laneE = lanes[0][1];
-      const nPosts = Math.trunc(P.n_posts);
+      const nPosts = K.slcPosts(P);
       const nPostsG = dual ? Math.trunc(P.n_posts_gsc) : 0;
       this.sys = [new Sys(0, 'SLC', lanes[0][0], lanes[0][1], 0, nPosts, P.t_post)];
       if (dual) this.sys.push(new Sys(1, 'GSC', lanes[1][0], lanes[1][1], nPosts, nPosts + nPostsG, K.gscSpotTime(P)));
@@ -754,7 +756,7 @@
       max_perf: maxPerf(P, tonnes, nShifts),
       series, tracks, state_names: STATE_NAMES.slice(),
       route: {
-        L_path: P.L_path, n_blocks: eng.laneG.m, nodes, n_posts: Math.trunc(P.n_posts),
+        L_path: P.L_path, n_blocks: eng.laneG.m, nodes, n_posts: K.slcPosts(P),
         n_posts_gsc: eng.sys.length > 1 ? eng.sys[1].p1 - eng.sys[1].p0 : 0,
         post_names: eng.postNames,
         nodes_gsc: eng.sys.length > 1 ? eng.sys[1].laneG.eq.slice() : [],
@@ -812,13 +814,14 @@
     const mTrain = n * P.m_wag;
     const tEff = (P.T_sm - P.t_to_start - P.t_to_end) * P.ktg;
     const fl = K.fleet(P), dual = fl.gsc > 0, pl = K.plans(P);
-    const zn = dual ? K.zoneAtu(P) : null, tr = dual ? K.trunkAtu(P) : null;
+    const zn = K.zoneAtu(P), tr = dual ? K.trunkAtu(P) : null;
+    const nSlcPosts = K.slcPosts(P);
     const lp4 = laneParts(P, nb), pgz = lp4[0], pez = lp4[1], pg2 = lp4[2], pe2 = lp4[3];
     const occ = trackOcc(P, Lg, Le, S, P.x_obsh_g || 0, P.x_obsh_p || 0, nb, Lp, v, pgz, pez);
     const tCycOcc = occ[0], tOcc = occ[1], pg = occ[2];
     const links = [
       { key: 'locos', name: 'Электровозы Ferrit', rate: fl.slc * 3600 / cyc, formula: 'n_ЭВ · 3600 / t_ц' },
-      { key: 'posts', name: Math.trunc(P.n_posts) === 1 ? 'Пост прямой погрузки с АТУ (С-20)' : 'Посты погрузки С-14, С-15', rate: P.n_posts * 3600 / tLoad, formula: 'n_пост · 3600 / t_погр.сост' },
+      { key: 'posts', name: nSlcPosts === 1 ? 'Пост прямой погрузки с АТУ (С-20)' : 'Посты погрузки С-14, С-15', rate: nSlcPosts * 3600 / tLoad, formula: 'n_пост · 3600 / t_погр.сост' },
       { key: 'loader', name: 'ПДМ ST1030 №2', rate: P.n_loader * 3600 / (n * K.wagonLoadTime(P)), formula: 'n_ПДМ · 3600 / (n · t_ПДМ)' },
       { key: 'kdrv', name: 'КДРВ №2', rate: 3600 / P.t_unload, formula: '3600 / t_разгр' },
       { key: 'track', name: 'Блок-участок (два прохода за цикл)', rate: 3600 / tCycOcc, formula: S > 0 ? '3600 / (2 · (L_общ + L_п) / v)' : '3600 / (2 · (L_б + L_п) / v)' },
@@ -872,6 +875,12 @@
       }
       if (trunkInfo) zone = Object.assign({}, zone || {}, { trunk: trunkInfo });
     }
+    if (zn && !dual) {
+      // без GSC участок занимает только состав SLC от входа до выхода с поста
+      const tZaS = 2 * la + lb + (zn[0] + zn[1] + Lp) / v + tLoad;
+      links.push({ key: 'zone', name: 'Однопутный участок у С-20 (пост АТУ)', rate: 3600 / tZaS, formula: '3600 / t_зан,SLC,  t_зан,SLC = 2a + b + (L_уч,п + L_уч,гр + L_п)/v + t_погр.сост' });
+      zone = { t_slc: tZaS, t_gsc: 0, share_gsc: 0, L: zn[2], L_e: zn[0], L_g: zn[1], x_gsc: zn[3] };
+    }
     systems.push(pack('SLC', 'SLC (прямая погрузка с АТУ)', links));
     if (dual) systems.push(gscPack);
     const s0 = systems[0];
@@ -884,7 +893,7 @@
       params: P,
       geometry: {
         L_path: P.L_path, n_blocks: S > 0 ? pg.length : nb, L_block: Lb, L_gruz: Lg, L_por: Le, L_obsh: S, nodes, L_train: Lp, L_razm: P.L_razm, cap_loop: cap,
-        n_posts: Math.trunc(P.n_posts),
+        n_posts: nSlcPosts,
         gsc: dual ? { L_gruz: g2[0], L_por: g2[1], L_obsh: g2[2], n_posts: Math.trunc(P.n_posts_gsc) } : null,
         post_xy: [10036, 33512], kdrv_xy: [8156, 33295],
         chord_m: Math.hypot(10036 - 8156, 33512 - 33295),
@@ -900,7 +909,7 @@
       capacity: {
         links, bottleneck: s0.bottleneck, rate_min: s0.rate_min,
         required_rate: tEff > 0 ? pl[2] / (mTrain * tEff / 3600) : null,
-        trains_ref: trainsRef, tonnes_ref: tonnesRef, tail_trains: Math.trunc(P.n_posts) + (dual ? Math.trunc(P.n_posts_gsc) : 0),
+        trains_ref: trainsRef, tonnes_ref: tonnesRef, tail_trains: nSlcPosts + (dual ? Math.trunc(P.n_posts_gsc) : 0),
         plan_shift: pl[2], plan_pct_ref: pl[2] ? tonnesRef / pl[2] : null,
         systems, zone,
       },

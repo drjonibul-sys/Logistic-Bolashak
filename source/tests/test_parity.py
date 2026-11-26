@@ -83,6 +83,8 @@ def make_jobs():
              ("zone-many-slc", dict(zone, n_loco=12, n_loco_gsc=3), "shift"),
              ("zone-one-gsc", dict(zone, n_loco=7, n_loco_gsc=1, n_loco_rem=1), "day"),
              ("zone-slow", dict(zone, n_loco=9, n_loco_gsc=4, k_v=0.4), "shift"),
+             ("zone-two-posts", dict(zone, n_loco=9, n_loco_gsc=3, n_posts=2), "shift"),
+             ("zone-slc-only", dict(zone, n_loco=9, n_loco_gsc=0, n_posts=2), "shift"),
              ("zone-two-blocks", dict(zone, n_loco=9, n_loco_gsc=3, n_blocks=2), "shift"),
              ("zone-twenty-blocks", dict(zone, n_loco=9, n_loco_gsc=3, n_blocks=20), "shift"),
              ("zone-kdrv2", dict(zone, n_loco=9, n_loco_gsc=3, kdrv_gsc=2), "shift"),

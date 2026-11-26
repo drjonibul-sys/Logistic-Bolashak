@@ -384,9 +384,19 @@ class TestDualSystems(unittest.TestCase):
 
     def test_atu_zone_off_without_direct_post(self):
         from sim import kinematics as K
-        self.assertIsNone(K.zone_atu(dict(self.DUAL, n_posts=2, **self.ZONE)))
-        self.assertIsNone(K.zone_atu(dict(self.DUAL, n_loco_gsc=0, **self.ZONE)))
+        # зона задана -> один пост SLC принудительно (n_posts=2 игнорируется), зона работает и без GSC
+        self.assertIsNotNone(K.zone_atu(dict(self.DUAL, n_posts=2, **self.ZONE)))
+        self.assertEqual(K.slc_posts(dict(self.DUAL, n_posts=2, **self.ZONE)), 1)
+        self.assertIsNotNone(K.zone_atu(dict(self.DUAL, n_loco_gsc=0, **self.ZONE)))
         self.assertIsNone(K.zone_atu(dict(self.DUAL, L_atu_e=0.0, **{k: v for k, v in self.ZONE.items() if k != "L_atu_e"})))
+
+    def test_single_loading_train_on_atu_post(self):
+        """При n_posts=2 и заданной зоне вагонетки грузятся только у одного состава: посты не чередуются."""
+        p = dict(self.DUAL, n_posts=2, **self.ZONE)
+        r = simulate(p, "shift")
+        self.assertEqual(scheme(p)["geometry"]["n_posts"], 1)
+        self.assertFalse(r["checks"]["deadlock"])
+        self.assertEqual(simulate(dict(p, n_posts=1), "shift")["kpi"]["tonnes"], r["kpi"]["tonnes"])
 
     def test_legacy_unchanged(self):
         d = PR.defaults()

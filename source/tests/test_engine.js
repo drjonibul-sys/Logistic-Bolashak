@@ -624,9 +624,10 @@ test('однопутный участок у С-20: GSC ждёт погрузк�
   assert.ok(sc.capacity.links.some(x => x.key === 'zone'));
   near(sc.capacity.tonnes_ref, sc.capacity.systems[0].tonnes_ref + sc.capacity.systems[1].tonnes_ref, 1e-9, 'сумма максимумов');
   // участок не действует при двух постах SLC или без GSC
-  assert.equal(LG.K.zoneAtu(Object.assign({}, z, { n_posts: 2 })), null);
-  assert.equal(LG.K.zoneAtu(Object.assign({}, z, { n_loco_gsc: 0 })), null);
-  assert.equal(LG.scheme(Object.assign({}, z, { n_loco_gsc: 0 })).capacity.zone, null);
+  assert.notEqual(LG.K.zoneAtu(Object.assign({}, z, { n_posts: 2 })), null);
+  assert.equal(LG.K.slcPosts(Object.assign({}, z, { n_posts: 2 })), 1);
+  assert.notEqual(LG.K.zoneAtu(Object.assign({}, z, { n_loco_gsc: 0 })), null);
+  assert.ok(LG.scheme(Object.assign({}, z, { n_loco_gsc: 0 })).capacity.zone);
 });
 
 test('одноколейные перегоны: SLC и GSC делят блоки, схема получает звено «перегон»', () => {
