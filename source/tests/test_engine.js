@@ -9,8 +9,8 @@ const LG = require(path.join(__dirname, '..', 'static', 'js', 'engine.js'));
 const D = LG.defaults();
 const near = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg || ''} ${a} != ${b}`);
 
-test('справочник: 225 параметр, значения проходят проверку', () => {
-  assert.equal(Object.keys(D).length, 225);
+test('справочник: 228 параметр, значения проходят проверку', () => {
+  assert.equal(Object.keys(D).length, 228);
   const v = LG.validate(D);
   assert.deepEqual(v.errors, []);
   assert.deepEqual(v.clean, D);
@@ -612,7 +612,7 @@ test('GSC: максимум по техническим параметрам с�
 });
 
 test('однопутный участок у С-20: GSC ждёт погрузки SLC, выпуск ниже, участок входит в схему', () => {
-  const ZONE = { L_atu: 254, L_atu_e: 75, L_atu_g: 179, x_atu_gsc: 975.3 };
+  const ZONE = { L_atu: 415.8, L_atu_e: 183.9, L_atu_g: 232.2, x_atu_gsc: 866.9 };
   const base = Object.assign({}, DUAL, { n_loco: 9, n_loco_gsc: 3, n_loco_rez: 1, n_loco_rem: 0 });
   const z = Object.assign({}, base, ZONE);
   const r0 = LG.simulate(base, 'shift'), r1 = LG.simulate(z, 'shift');
@@ -627,6 +627,21 @@ test('однопутный участок у С-20: GSC ждёт погрузк�
   assert.equal(LG.K.zoneAtu(Object.assign({}, z, { n_posts: 2 })), null);
   assert.equal(LG.K.zoneAtu(Object.assign({}, z, { n_loco_gsc: 0 })), null);
   assert.equal(LG.scheme(Object.assign({}, z, { n_loco_gsc: 0 })).capacity.zone, null);
+});
+
+test('одноколейные перегоны: SLC и GSC делят блоки, схема получает звено «перегон»', () => {
+  const base = Object.assign({}, DUAL, { n_loco: 9, n_loco_gsc: 3, n_loco_rez: 1, n_loco_rem: 0, L_atu: 415.8, L_atu_e: 183.9, L_atu_g: 232.2, x_atu_gsc: 866.9 });
+  const tr = Object.assign({}, base, { L_et_a: 422.1, L_et_b: 1874.2, L_lt2: 497.4 });
+  assert.equal(LG.K.trunkAtu(base), null);
+  assert.deepEqual(LG.K.trunkAtu(tr), [422.1, 1874.2, 497.4]);
+  assert.equal(LG.K.trunkAtu(Object.assign({}, tr, { L_atu: 0 })), null, 'перегоны действуют только с участком у С-20');
+  const a = LG.simulate(base, 'shift'), b = LG.simulate(tr, 'shift');
+  assert.ok(b.kpi.tonnes <= a.kpi.tonnes + 1e-9, 'общие перегоны выпуск не повышают');
+  assert.equal(b.checks.deadlock, false);
+  near(b.checks.balance_diff, 0, 1e-6, 'баланс');
+  const sc = LG.scheme(tr);
+  assert.ok(sc.capacity.links.some(x => x.key === 'trunk') && sc.capacity.zone.trunk.rate > 0);
+  assert.equal(LG.scheme(base).capacity.zone.trunk, undefined);
 });
 
 test('прежний режим: без ролей и планов систем результат не меняется', () => {

@@ -115,7 +115,7 @@
         Object.assign(mine, {
           L_gruz_gsc: ln.gsc.Lg, L_por_gsc: ln.gsc.Le, x_obsh_g_gsc: ln.gsc.xg, x_obsh_p_gsc: ln.gsc.xe, n_posts_gsc: Math.round(ln.gsc.posts),
           plan_slc: ln.plan.slc, plan_gsc: ln.plan.gsc,
-          L_atu: ln.atu.Lz, L_atu_e: ln.atu.Le, L_atu_g: ln.atu.Lg, x_atu_gsc: ln.atu.xz,
+          L_atu: ln.atu.Lz, L_atu_e: ln.atu.Le, L_atu_g: ln.atu.Lg, x_atu_gsc: ln.atu.xz, L_et_a: ln.atu.ea, L_et_b: ln.atu.eb, L_lt2: ln.atu.lt,
           n_loco_gsc: Math.round(ln.fleet.gsc), n_loco_rez: Math.round(ln.fleet.rez), n_loco_rem: Math.round(ln.fleet.rem), n_loco_por: Math.round(ln.fleet.por),
         });
       }

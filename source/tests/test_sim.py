@@ -319,7 +319,7 @@ class TestDualSystems(unittest.TestCase):
         self.assertEqual(c["plan_shift"], 2880.0)
         self.assertEqual(len(scheme(dict(self.DUAL, n_loco_gsc=0))["capacity"]["systems"]), 1)
 
-    ZONE = dict(L_atu=254.0, L_atu_e=75.0, L_atu_g=179.0, x_atu_gsc=975.3)
+    ZONE = dict(L_atu=415.8, L_atu_e=183.9, L_atu_g=232.2, x_atu_gsc=866.9)
 
     def test_atu_zone_gsc_waits_for_slc_loading(self):
         """Однопутный участок у С-20: пока состав SLC стоит на посту, груженый GSC на участок не входит (26.11.2026)."""
@@ -356,6 +356,31 @@ class TestDualSystems(unittest.TestCase):
         self.assertGreater(z["t_slc"], z["t_gsc"])
         self.assertTrue(any(x["key"] == "zone" for x in sc["capacity"]["links"]))
         self.assertAlmostEqual(sc["capacity"]["tonnes_ref"], sum(x["tonnes_ref"] for x in sc["capacity"]["systems"]), 6)
+
+    TRUNK = dict(L_et_a=422.1, L_et_b=1874.2, L_lt2=497.4)
+
+    def test_single_track_trunk_is_shared_between_systems(self):
+        """В шахте нет двухколейных участков: попутные перегоны SLC и GSC делят одни и те же блоки (26.11.2026)."""
+        from sim import engine as E
+        p = dict(self.DUAL, n_loco=9, n_loco_gsc=3, n_loco_rez=1, n_loco_rem=0, **self.ZONE, **self.TRUNK)
+        eng = E.Engine(p, [(0.0, 1000.0)], 1000.0)
+        s0, s1 = eng.sys
+        same = lambda a, b: [x for x in a.blocks if any(x is y for y in b.blocks)]
+        # гружёные: однопутный участок, перегон до и после грузового квершлага, сам квершлаг; порожние: перегон до и после квершлага
+        self.assertGreaterEqual(len(same(s0.lane_g, s1.lane_g)), 4)
+        self.assertGreaterEqual(len(same(s0.lane_e, s1.lane_e)), 3)
+        # гружёный и порожний путь делят только участок у С-20 и грузовой квершлаг
+        self.assertEqual(len(same(s0.lane_g, s0.lane_e)), 2)
+        no = E.Engine(dict(p, L_et_a=0.0), [(0.0, 1000.0)], 1000.0)
+        self.assertEqual(len(same(no.sys[0].lane_e, no.sys[1].lane_e)), 1, "без перегонов общий только грузовой квершлаг")
+        r = simulate(p, "shift")
+        z = simulate(dict(p, L_et_a=0.0), "shift")
+        self.assertFalse(r["checks"]["deadlock"])
+        self.assertAlmostEqual(r["checks"]["balance_diff"], 0.0, 6)
+        self.assertLessEqual(r["kpi"]["tonnes"], z["kpi"]["tonnes"] + 1e-9)
+        sc = scheme(p)["capacity"]
+        self.assertIn("trunk", [x["key"] for x in sc["links"]])
+        self.assertIn("trunk", sc["zone"])
 
     def test_atu_zone_off_without_direct_post(self):
         from sim import kinematics as K

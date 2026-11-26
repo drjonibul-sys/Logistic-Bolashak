@@ -190,3 +190,13 @@ def zone_atu(p: dict):
         return None
     return ze, zg, lz, xz
 
+
+def trunk_atu(p: dict):
+    """Общие одноколейные перегоны SLC и GSC (порожние за грузовым квершлагом и до него, гружёные после него) или None.
+
+    Действуют только вместе с однопутным участком у С-20; нужны все три длины больше нуля."""
+    et_a, et_b, lt2 = p.get("L_et_a", 0.0), p.get("L_et_b", 0.0), p.get("L_lt2", 0.0)
+    if not (et_a > 0 and et_b > 0 and lt2 > 0) or zone_atu(p) is None:
+        return None
+    return et_a, et_b, lt2
+

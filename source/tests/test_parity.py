@@ -76,7 +76,8 @@ def make_jobs():
              ("roles-all-gsc", dict(dual, n_loco=4, n_loco_gsc=4), "shift")]
     # однопутный участок у С-20: пост SLC держит участок, груженые GSC ждут (задание 26.11.2026)
     zone = dict(dual, L_gruz_gsc=3242.3, L_por_gsc=4174.7, x_obsh_g_gsc=1727.8, x_obsh_p_gsc=2753.1,
-                L_atu=254.0, L_atu_e=75.0, L_atu_g=179.0, x_atu_gsc=975.3)
+                L_atu=415.8, L_atu_e=183.9, L_atu_g=232.2, x_atu_gsc=866.9)
+    trunk = dict(zone, L_et_a=422.1, L_et_b=1874.2, L_lt2=497.4)
     jobs += [("zone-default", dict(zone, n_loco=9, n_loco_gsc=3, n_loco_rez=1), "shift"),
              ("zone-day", dict(zone, n_loco=9, n_loco_gsc=3, n_loco_rez=1), "day"),
              ("zone-many-slc", dict(zone, n_loco=12, n_loco_gsc=3), "shift"),
@@ -88,6 +89,17 @@ def make_jobs():
              ("zone-ktg-low-day", dict(zone, n_loco=9, n_loco_gsc=3, ktg=0.4), "day"),
              ("zone-no-loop", dict(zone, n_loco=9, n_loco_gsc=3, L_razm=20.0), "shift"),
              ("zone-off-two-posts", dict(zone, n_loco=9, n_loco_gsc=3, n_posts=2), "shift")]
+    # общие одноколейные перегоны SLC и GSC (все пути одноколейные, 26.11.2026)
+    jobs += [("trunk-default", dict(trunk, n_loco=9, n_loco_gsc=3, n_loco_rez=1), "shift"),
+             ("trunk-day", dict(trunk, n_loco=9, n_loco_gsc=3, n_loco_rez=1), "day"),
+             ("trunk-many", dict(trunk, n_loco=14, n_loco_gsc=5), "shift"),
+             ("trunk-slow", dict(trunk, n_loco=9, n_loco_gsc=4, k_v=0.4), "shift"),
+             ("trunk-two-blocks", dict(trunk, n_loco=9, n_loco_gsc=3, n_blocks=2), "shift"),
+             ("trunk-twenty-blocks", dict(trunk, n_loco=9, n_loco_gsc=3, n_blocks=20), "shift"),
+             ("trunk-kdrv2", dict(trunk, n_loco=9, n_loco_gsc=3, kdrv_gsc=2), "day"),
+             ("trunk-three-loops", dict(trunk, n_loco=10, n_loco_gsc=3, L_razm=200.0), "shift"),
+             ("trunk-one-gsc", dict(trunk, n_loco=7, n_loco_gsc=1), "shift"),
+             ("trunk-no-zone", dict(trunk, L_atu=0.0, n_loco=9, n_loco_gsc=3), "shift")]
     rnd = random.Random(20261024)
     meta = PR.meta()
     for i in range(40):

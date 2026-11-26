@@ -285,7 +285,7 @@
     if (o.gsc) {   // маршруты GSC: три орта, КДРВ-1 или КДРВ-2
       [26, 27, 28].forEach(ort => { poly(gscTable(ort, o.gsc, 'empty').pts, '#7fb8a4', 3); poly(gscTable(ort, o.gsc, 'loaded').pts, '#c9a15e', 3, [8, 5]); });
       /* однопутный участок у С-20: на нём стоит пост SLC, груженый GSC проходит только при свободном посте */
-      const zone = ['otsw2', 's20', 's55', 'c1', 'otsw'].filter(id => byId[id]).map(id => [byId[id].x, byId[id].y]);
+      const zone = ['j31', 'otsw2', 's20', 's55', 'c1', 'otsw'].filter(id => byId[id]).map(id => [byId[id].x, byId[id].y]);
       if (zone.length > 1) poly(zone, '#7b2d8e', 7, [14, 4]);
     }
     /* подписи фоновых линий */

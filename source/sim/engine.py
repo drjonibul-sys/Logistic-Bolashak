@@ -67,28 +67,94 @@ def _split(L, xs, S, nb):
 
 
 def _split_multi(L, segs, nb):
-    """Блок-участки полосы с несколькими общими участками: segs — список (начало, длина, признак), признак True — общий
-    грузовой квершлаг, "za" — однопутный участок у С-20. Свободные блоки делятся между промежутками пропорционально длине,
-    по одному минимум на непустой промежуток; при одном участке результат совпадает с _split."""
+    """Блок-участки полосы с несколькими общими участками: segs — список (начало, длина, ключ[, число блоков]).
+    Ключ True — общий грузовой квершлаг, "za" — однопутный участок у С-20, остальные ключи — общие перегоны двух систем;
+    если задано число блоков n > 1, участок делится на n равных блоков с ключами (ключ, i). Свободные блоки делятся между
+    промежутками пропорционально длине, по одному минимум на непустой промежуток; при одном участке результат совпадает с _split."""
     segs = sorted(segs, key=lambda x: x[0])
     cur, gaps, keep = 0.0, [], []
-    for xs, S, key in segs:
+    for sg in segs:
+        xs, S, key = sg[0], sg[1], sg[2]
+        n = sg[3] if len(sg) > 3 else 1
         xs = min(max(xs, cur), L)
         S = min(S, L - xs)
+        if S <= 1e-9:
+            continue
         gaps.append(xs - cur)
-        keep.append((S, key))
+        keep.append([(S / n, (key, i)) for i in range(n)] if n > 1 else [(S, key)])
         cur = xs + S
     gaps.append(L - cur)
     f = sum(gaps)
-    nf = max(nb - len(segs), 0)
+    nf = max(nb - sum(len(k) for k in keep), 0)
     cnt = [((max(1, int(math.floor(nf * g / f + 0.5))) if g > 1e-9 else 0) if f > 0 else 0) for g in gaps]
     out = []
     for i, g in enumerate(gaps):
         if cnt[i]:
             out += [(g / cnt[i], False)] * cnt[i]
         if i < len(keep):
-            out.append(keep[i])
+            out += keep[i]
     return out
+
+
+class _Shared(dict):
+    """Общие блоки по ключам: создаются при первом обращении, один объект на все полосы."""
+
+    def __missing__(self, key):
+        b = self[key] = _Block()
+        return b
+
+
+def _lane_parts(P, nb):
+    """Блок-участки четырёх полос: гружёный и порожний путь SLC и GSC. Возвращает (pg, pe, pg2, pe2); для GSC без GSC None.
+
+    Одноколейная шахта (26.11.2026): двухколейных участков нет. Общий блок обеих систем: грузовой квершлаг №1 (ключ True,
+    оба направления), однопутный участок у С-20 (ключ "za", пост SLC внутри), попутные перегоны гружёных ("LT1", "LT2")
+    и порожних ("ETb", "ETa"): составы разных систем идут по одной выработке и делят её блоки."""
+    Lg, Le, S = K.lanes(P)
+    fl = K.fleet(P)
+    dual = fl["gsc"] > 0
+    zn = K.zone_atu(P) if dual else None
+    tr = K.trunk_atu(P) if dual else None
+    xg, xe = P.get("x_obsh_g", 0.0), P.get("x_obsh_p", 0.0)
+    Lb = P["L_path"] / nb
+
+    def ns(x):
+        return max(1, int(math.floor(x / Lb + 0.5)))
+
+    if zn:
+        sg, se = [(0.0, zn[1], "za")], [(0.0, zn[0], "za")]
+        if tr:
+            sg.append((zn[1], xg - zn[1], "LT1", ns(xg - zn[1])))
+            se.append((xe - tr[1], tr[1], "ETb", ns(tr[1])))
+        sg.append((xg, S, True))
+        se.append((xe, S, True))
+        if tr:
+            sg.append((xg + S, tr[2], "LT2", ns(tr[2])))
+            se.append((xe + S, tr[0], "ETa", ns(tr[0])))
+        pg, pe = _split_multi(Lg, sg, nb), _split_multi(Le, se, nb)
+    else:
+        pg, pe = _split(Lg, xg, S, nb), _split(Le, xe, S, nb)
+    if not dual:
+        return pg, pe, None, None
+    Lg2, Le2, S2 = K.lanes_gsc(P)
+    xg2 = P["x_obsh_g_gsc"] if P.get("x_obsh_g_gsc", 0) > 0 else xg
+    xe2 = P["x_obsh_p_gsc"] if P.get("x_obsh_p_gsc", 0) > 0 else xe
+    if zn:
+        sg2 = [(zn[3], zn[2], "za")]
+        if tr:
+            sg2.append((zn[3] + zn[2], xg2 - zn[3] - zn[2], "LT1", ns(xg - zn[1])))
+        sg2.append((xg2, S2, True))
+        if tr:
+            sg2.append((xg2 + S2, tr[2], "LT2", ns(tr[2])))
+        pg2 = _split_multi(Lg2, sg2, nb)
+    else:
+        pg2 = _split(Lg2, xg2, S2, nb)
+    if tr:
+        se2 = [(xe2 - tr[1], tr[1], "ETb", ns(tr[1])), (xe2, S2, True), (xe2 + S2, tr[0], "ETa", ns(tr[0]))]
+        pe2 = _split_multi(Le2, se2, nb)
+    else:
+        pe2 = _split(Le2, xe2, S2, nb)
+    return pg, pe, pg2, pe2
 
 
 class _Lane:
@@ -173,12 +239,7 @@ class Engine:
         self.fleet = fl
         dual = fl["gsc"] > 0
         zn = K.zone_atu(P) if dual else None
-        if zn:
-            pg = _split_multi(Lg, [(0.0, zn[1], "za"), (P.get("x_obsh_g", 0.0), S, True)], self.nb)
-            pe = _split_multi(Le, [(0.0, zn[0], "za"), (P.get("x_obsh_p", 0.0), S, True)], self.nb)
-        else:
-            pg = _split(Lg, P.get("x_obsh_g", 0.0), S, self.nb)
-            pe = _split(Le, P.get("x_obsh_p", 0.0), S, self.nb)
+        pg, pe, pg2, pe2 = _lane_parts(P, self.nb)
         self.Lp = K.train_length(P["L_loco"], int(P["n_wagons"]), P["L_wag"])
         self.cap_loop = K.loop_capacity(P["L_razm"], self.Lp, P["L_zap"])
         self.loss_a = K.accel_loss(self.v, P["a"])
@@ -186,17 +247,13 @@ class Engine:
         lane_specs = [(Lg, Le, pg, pe)]
         if dual:
             Lg2, Le2, S2 = K.lanes_gsc(P)
-            xg2 = P["x_obsh_g_gsc"] if P.get("x_obsh_g_gsc", 0) > 0 else P.get("x_obsh_g", 0.0)
-            xe2 = P["x_obsh_p_gsc"] if P.get("x_obsh_p_gsc", 0) > 0 else P.get("x_obsh_p", 0.0)
-            pg2 = _split_multi(Lg2, [(zn[3], zn[2], "za"), (xg2, S2, True)], self.nb) if zn else _split(Lg2, xg2, S2, self.nb)
-            lane_specs.append((Lg2, Le2, pg2, _split(Le2, xe2, S2, self.nb)))
+            lane_specs.append((Lg2, Le2, pg2, pe2))
         lanes = []
         self.za = None
         if self.shared_mode:
-            sh = {True: _Block()}
+            sh = _Shared()
             if zn:
-                self.za = _Block()
-                sh["za"] = self.za
+                self.za = sh["za"]
             self.blocks = []
             for lg, le, parts_g, parts_e in lane_specs:
                 g_ln = _Lane(lg, P["L_path"], parts_g, sh)
@@ -783,11 +840,8 @@ def scheme(P):
     dual = fl["gsc"] > 0
     pl_slc, pl_gsc, pl_all = K.plans(P)
     zn = K.zone_atu(P) if dual else None
-    if zn:
-        pgz = _split_multi(Lg, [(0.0, zn[1], "za"), (P.get("x_obsh_g", 0.0), S, True)], nb)
-        pez = _split_multi(Le, [(0.0, zn[0], "za"), (P.get("x_obsh_p", 0.0), S, True)], nb)
-    else:
-        pgz = pez = None
+    tr = K.trunk_atu(P) if dual else None
+    pgz, pez, pg2, pe2 = _lane_parts(P, nb)
     t_cyc_occ, t_occ, pg = _track_occ(P, Lg, Le, S, P.get("x_obsh_g", 0.0), P.get("x_obsh_p", 0.0), nb, Lp, v, pgz, pez)
     links = [
         {"key": "locos", "name": "Электровозы Ferrit", "rate": fl["slc"] * 3600.0 / cyc,
@@ -814,8 +868,7 @@ def scheme(P):
         Lg2, Le2, S2 = K.lanes_gsc(P)
         xg2 = P.get("x_obsh_g_gsc", 0.0) or P.get("x_obsh_g", 0.0)
         xe2 = P.get("x_obsh_p_gsc", 0.0) or P.get("x_obsh_p", 0.0)
-        pg2 = _split_multi(Lg2, [(zn[3], zn[2], "za"), (xg2, S2, True)], nb) if zn else None
-        c2, _, _ = _track_occ(P, Lg2, Le2, S2, xg2, xe2, nb, Lp, v, pg2, None)
+        c2, _, _ = _track_occ(P, Lg2, Le2, S2, xg2, xe2, nb, Lp, v, pg2, pe2)
         t_load2 = K.gsc_spot_time(P) + K.gsc_load_time(P)
         links2 = [
             {"key": "locos", "name": "Электровозы Ferrit (GSC)", "rate": fl["gsc"] * 3600.0 / K.cycle_analytic_gsc(P),
@@ -831,7 +884,19 @@ def scheme(P):
             t_za_g = (zn[2] + Lp) / v
             links2.append({"key": "zone", "name": "Однопутный участок у С-20", "rate": 3600.0 / t_za_g,
                            "formula": "3600 / t_зан,GSC,  t_зан,GSC = (L_уч + L_п) / v"})
+        r_trunk = None
+        if tr:
+            # попутные перегоны: блоки, общие для SLC и GSC (все длины блоков четырёх полос)
+            lt = [x for prt in (pgz, pez, pg2, pe2) for x, k in prt if k and k is not True and k != "za"]
+            r_trunk = 3600.0 / ((max(lt) + Lp) / v)
+            links2.append({"key": "trunk", "name": "Общий одноколейный перегон (SLC и GSC)", "rate": r_trunk,
+                           "formula": "3600 / ((L_блок + L_п) / v)"})
         gsc_pack = pack("GSC", "GSC (погрузка с ортов 26, 27, 28)", links2)
+        if tr:
+            # блок перегона занимают составы обеих систем: SLC остаётся пропускная способность за вычетом проездов GSC
+            r_g = gsc_pack["trains_ref"] * 3600.0 / t_eff if t_eff > 0 else 0.0
+            links.append({"key": "trunk", "name": "Общий одноколейный перегон (SLC и GSC)", "rate": max(r_trunk - r_g, 0.0),
+                          "formula": "3600 / ((L_блок + L_п) / v) − N_GSC / T_эф · 3600"})
         if zn:
             # состав SLC держит участок от входа до выхода с поста; проезды GSC (приоритет гружёных) уменьшают время участка
             t_za_s = 2.0 * la + lb + (zn[0] + zn[1] + Lp) / v + t_load
@@ -840,6 +905,8 @@ def scheme(P):
                           "rate": (1.0 - share_g) * 3600.0 / t_za_s,
                           "formula": "(1 − N_GSC · t_зан,GSC / T_эф) · 3600 / t_зан,SLC,  t_зан,SLC = 2a + b + (L_уч,п + L_уч,гр + L_п)/v + t_погр.сост"})
             zone = {"t_slc": t_za_s, "t_gsc": t_za_g, "share_gsc": share_g, "L": zn[2], "L_e": zn[0], "L_g": zn[1], "x_gsc": zn[3]}
+        if tr:
+            zone = dict(zone or {}, trunk={"et_a": tr[0], "et_b": tr[1], "lt2": tr[2], "rate": r_trunk})
     systems.append(pack("SLC", "SLC (прямая погрузка с АТУ)", links))
     if dual:
         systems.append(gsc_pack)
