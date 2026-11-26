@@ -9,8 +9,8 @@ const LG = require(path.join(__dirname, '..', 'static', 'js', 'engine.js'));
 const D = LG.defaults();
 const near = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg || ''} ${a} != ${b}`);
 
-test('справочник: 221 параметр, значения проходят проверку', () => {
-  assert.equal(Object.keys(D).length, 221);
+test('справочник: 225 параметр, значения проходят проверку', () => {
+  assert.equal(Object.keys(D).length, 225);
   const v = LG.validate(D);
   assert.deepEqual(v.errors, []);
   assert.deepEqual(v.clean, D);
@@ -609,6 +609,24 @@ test('GSC: максимум по техническим параметрам с�
   assert.equal(mp.systems.length, 2);
   // без GSC максимум и ориентир прежние
   assert.equal(LG.scheme(Object.assign({}, DUAL, { n_loco_gsc: 0 })).capacity.systems.length, 1);
+});
+
+test('однопутный участок у С-20: GSC ждёт погрузки SLC, выпуск ниже, участок входит в схему', () => {
+  const ZONE = { L_atu: 254, L_atu_e: 75, L_atu_g: 179, x_atu_gsc: 975.3 };
+  const base = Object.assign({}, DUAL, { n_loco: 9, n_loco_gsc: 3, n_loco_rez: 1, n_loco_rem: 0 });
+  const z = Object.assign({}, base, ZONE);
+  const r0 = LG.simulate(base, 'shift'), r1 = LG.simulate(z, 'shift');
+  assert.ok(r1.kpi.tonnes < r0.kpi.tonnes, 'участок снижает выпуск');
+  assert.equal(r1.checks.deadlock, false);
+  near(r1.checks.balance_diff, 0, 1e-6, 'баланс');
+  const sc = LG.scheme(z);
+  assert.ok(sc.capacity.zone && sc.capacity.zone.t_slc > sc.capacity.zone.t_gsc);
+  assert.ok(sc.capacity.links.some(x => x.key === 'zone'));
+  near(sc.capacity.tonnes_ref, sc.capacity.systems[0].tonnes_ref + sc.capacity.systems[1].tonnes_ref, 1e-9, 'сумма максимумов');
+  // участок не действует при двух постах SLC или без GSC
+  assert.equal(LG.K.zoneAtu(Object.assign({}, z, { n_posts: 2 })), null);
+  assert.equal(LG.K.zoneAtu(Object.assign({}, z, { n_loco_gsc: 0 })), null);
+  assert.equal(LG.scheme(Object.assign({}, z, { n_loco_gsc: 0 })).capacity.zone, null);
 });
 
 test('прежний режим: без ролей и планов систем результат не меняется', () => {

@@ -66,13 +66,38 @@ def _split(L, xs, S, nb):
     return [(a / na, False) for _ in range(na)] + [(S, True)] + [(b / nbb, False) for _ in range(nbb)]
 
 
+def _split_multi(L, segs, nb):
+    """Блок-участки полосы с несколькими общими участками: segs — список (начало, длина, признак), признак True — общий
+    грузовой квершлаг, "za" — однопутный участок у С-20. Свободные блоки делятся между промежутками пропорционально длине,
+    по одному минимум на непустой промежуток; при одном участке результат совпадает с _split."""
+    segs = sorted(segs, key=lambda x: x[0])
+    cur, gaps, keep = 0.0, [], []
+    for xs, S, key in segs:
+        xs = min(max(xs, cur), L)
+        S = min(S, L - xs)
+        gaps.append(xs - cur)
+        keep.append((S, key))
+        cur = xs + S
+    gaps.append(L - cur)
+    f = sum(gaps)
+    nf = max(nb - len(segs), 0)
+    cnt = [((max(1, int(math.floor(nf * g / f + 0.5))) if g > 1e-9 else 0) if f > 0 else 0) for g in gaps]
+    out = []
+    for i, g in enumerate(gaps):
+        if cnt[i]:
+            out += [(g / cnt[i], False)] * cnt[i]
+        if i < len(keep):
+            out.append(keep[i])
+    return out
+
+
 class _Lane:
     """Полоса движения: блоки (ссылки на объекты, общий блок один на обе полосы), узлы, координаты в масштабе L_path."""
 
     def __init__(self, L, L_path, parts, shared_block, blocks=None):
         self.L = L
         self.len = [x for x, _ in parts]
-        self.blocks = blocks if blocks is not None else [shared_block if sh else _Block() for _, sh in parts]
+        self.blocks = blocks if blocks is not None else [shared_block[sh] if sh else _Block() for _, sh in parts]
         pos = [0.0]
         for x in self.len:
             pos.append(pos[-1] + x)
@@ -143,12 +168,17 @@ class Engine:
         Le = P["L_por"] if P.get("L_por", 0) > 0 else P["L_path"]
         S = P.get("L_obsh", 0.0)
         S = min(S, Lg, Le) if S > 0 else 0.0
-        pg = _split(Lg, P.get("x_obsh_g", 0.0), S, self.nb)
-        pe = _split(Le, P.get("x_obsh_p", 0.0), S, self.nb)
         self.shared_mode = S > 0
         fl = K.fleet(P)
         self.fleet = fl
         dual = fl["gsc"] > 0
+        zn = K.zone_atu(P) if dual else None
+        if zn:
+            pg = _split_multi(Lg, [(0.0, zn[1], "za"), (P.get("x_obsh_g", 0.0), S, True)], self.nb)
+            pe = _split_multi(Le, [(0.0, zn[0], "za"), (P.get("x_obsh_p", 0.0), S, True)], self.nb)
+        else:
+            pg = _split(Lg, P.get("x_obsh_g", 0.0), S, self.nb)
+            pe = _split(Le, P.get("x_obsh_p", 0.0), S, self.nb)
         self.Lp = K.train_length(P["L_loco"], int(P["n_wagons"]), P["L_wag"])
         self.cap_loop = K.loop_capacity(P["L_razm"], self.Lp, P["L_zap"])
         self.loss_a = K.accel_loss(self.v, P["a"])
@@ -158,10 +188,15 @@ class Engine:
             Lg2, Le2, S2 = K.lanes_gsc(P)
             xg2 = P["x_obsh_g_gsc"] if P.get("x_obsh_g_gsc", 0) > 0 else P.get("x_obsh_g", 0.0)
             xe2 = P["x_obsh_p_gsc"] if P.get("x_obsh_p_gsc", 0) > 0 else P.get("x_obsh_p", 0.0)
-            lane_specs.append((Lg2, Le2, _split(Lg2, xg2, S2, self.nb), _split(Le2, xe2, S2, self.nb)))
+            pg2 = _split_multi(Lg2, [(zn[3], zn[2], "za"), (xg2, S2, True)], self.nb) if zn else _split(Lg2, xg2, S2, self.nb)
+            lane_specs.append((Lg2, Le2, pg2, _split(Le2, xe2, S2, self.nb)))
         lanes = []
+        self.za = None
         if self.shared_mode:
-            sh = _Block()
+            sh = {True: _Block()}
+            if zn:
+                self.za = _Block()
+                sh["za"] = self.za
             self.blocks = []
             for lg, le, parts_g, parts_e in lane_specs:
                 g_ln = _Lane(lg, P["L_path"], parts_g, sh)
@@ -271,6 +306,14 @@ class Engine:
             if ns is not None:
                 self.at(ns, self.want_post, l)
             return
+        if self.za is not None and l.sys == 0 and l.holding is not self.za:
+            # пост С-20 стоит на однопутном участке: состав входит на него, как на блок-участок, и ждёт, пока участок свободен
+            self.set_state(l, "ожидание блок-участка")
+            l.dir = -1
+            l.node = 1
+            l.pending = self.loss_a
+            self.request_block(l, 0, 1)
+            return
         self.set_state(l, "ожидание поста")
         s = self.sys[l.sys]
         s.post_q.append(l)
@@ -281,6 +324,9 @@ class Engine:
         """Электровоз вне окна работы: цикл не начинается, ожидает начала следующего окна."""
         ns = self.next_window_start(self.t)
         self.set_state(l, "вне работы")
+        if self.za is not None and l.holding is self.za:
+            self.at(self.t, self.release_block, l.holding, l)
+            l.holding = None
         if ns is not None:
             self.at(ns, self.want_post, l)
 
@@ -360,7 +406,7 @@ class Engine:
     def request_block(self, l, j, node):
         ln = self.lane(l)
         B = ln.blocks[j]
-        if B.holder is None:
+        if B.holder is None or B.holder is l:
             self.grant(l, j)
             return
         B.waiters.append((l, self.t, j))
@@ -382,8 +428,9 @@ class Engine:
         t = self.t
         ln = self.lane(l)
         B = ln.blocks[j]
+        if B.holder is not l:
+            B.occ_start = t
         B.holder = l
-        B.occ_start = t
         if l.parked_at is not None:
             ln.parked[l.parked_at] -= 1
             l.parked_at = None
@@ -393,7 +440,7 @@ class Engine:
         dest = j + 1 if d == 1 else j
         end_dest = (dest == ln.m) if d == 1 else (dest == 0)
         t_arr = t + pend + ln.len[j] / self.v + (self.loss_b if end_dest else 0.0)
-        if l.holding is not None:
+        if l.holding is not None and l.holding is not B:
             self.at(t + pend + self.Lp / self.v, self.release_block, l.holding, l)
         l.holding = B
         self.set_state(l, "ход гружёный" if l.loaded else "ход порожний")
@@ -406,8 +453,11 @@ class Engine:
         d = l.dir
         ln = self.lane(l)
         if (d == 1 and node == ln.m) or (d == -1 and node == 0):
-            self.at(self.t + self.Lp / self.v, self.release_block, l.holding, l)
-            l.holding = None
+            if self.za is not None and d == -1 and l.sys == 0 and l.holding is self.za and self.in_window(self.t):
+                pass   # пост С-20 внутри однопутного участка: состав держит его до отправления гружёным
+            else:
+                self.at(self.t + self.Lp / self.v, self.release_block, l.holding, l)
+                l.holding = None
             if d == 1:
                 self.want_kdrv(l)
             else:
@@ -692,11 +742,11 @@ def max_perf(P, tonnes, n_shifts):
     return out
 
 
-def _track_occ(P, Lg, Le, S, xg, xe, nb, Lp, v):
+def _track_occ(P, Lg, Le, S, xg, xe, nb, Lp, v, pg=None, pe=None):
     """Занятость блока-участка за цикл: общий блок проходят оба состава, свободный блок — один."""
     if S > 0:
-        pg = _split(Lg, xg, S, nb)
-        pe = _split(Le, xe, S, nb)
+        pg = pg if pg is not None else _split(Lg, xg, S, nb)
+        pe = pe if pe is not None else _split(Le, xe, S, nb)
         free_max = max([x for x, sh in pg + pe if not sh] or [0.0])
         return max(2.0 * (S + Lp) / v, (free_max + Lp) / v), (S + Lp) / v, pg
     Lb = P["L_path"] / nb
@@ -732,7 +782,13 @@ def scheme(P):
     fl = K.fleet(P)
     dual = fl["gsc"] > 0
     pl_slc, pl_gsc, pl_all = K.plans(P)
-    t_cyc_occ, t_occ, pg = _track_occ(P, Lg, Le, S, P.get("x_obsh_g", 0.0), P.get("x_obsh_p", 0.0), nb, Lp, v)
+    zn = K.zone_atu(P) if dual else None
+    if zn:
+        pgz = _split_multi(Lg, [(0.0, zn[1], "za"), (P.get("x_obsh_g", 0.0), S, True)], nb)
+        pez = _split_multi(Le, [(0.0, zn[0], "za"), (P.get("x_obsh_p", 0.0), S, True)], nb)
+    else:
+        pgz = pez = None
+    t_cyc_occ, t_occ, pg = _track_occ(P, Lg, Le, S, P.get("x_obsh_g", 0.0), P.get("x_obsh_p", 0.0), nb, Lp, v, pgz, pez)
     links = [
         {"key": "locos", "name": "Электровозы Ferrit", "rate": fl["slc"] * 3600.0 / cyc,
          "formula": "n_ЭВ · 3600 / t_ц"},
@@ -752,11 +808,14 @@ def scheme(P):
         return {"key": key, "name": name, "links": lk, "bottleneck": low_["key"], "bottleneck_name": low_["name"],
                 "formula": low_["formula"], "rate_min": low_["rate"], "trains_ref": tr, "tonnes_ref": tr * m_train}
 
-    systems = [pack("SLC", "SLC (прямая погрузка с АТУ)", links)]
+    systems = []
+    zone = None
     if dual:
         Lg2, Le2, S2 = K.lanes_gsc(P)
-        c2, _, _ = _track_occ(P, Lg2, Le2, S2, P.get("x_obsh_g_gsc", 0.0) or P.get("x_obsh_g", 0.0),
-                              P.get("x_obsh_p_gsc", 0.0) or P.get("x_obsh_p", 0.0), nb, Lp, v)
+        xg2 = P.get("x_obsh_g_gsc", 0.0) or P.get("x_obsh_g", 0.0)
+        xe2 = P.get("x_obsh_p_gsc", 0.0) or P.get("x_obsh_p", 0.0)
+        pg2 = _split_multi(Lg2, [(zn[3], zn[2], "za"), (xg2, S2, True)], nb) if zn else None
+        c2, _, _ = _track_occ(P, Lg2, Le2, S2, xg2, xe2, nb, Lp, v, pg2, None)
         t_load2 = K.gsc_spot_time(P) + K.gsc_load_time(P)
         links2 = [
             {"key": "locos", "name": "Электровозы Ferrit (GSC)", "rate": fl["gsc"] * 3600.0 / K.cycle_analytic_gsc(P),
@@ -768,7 +827,22 @@ def scheme(P):
             {"key": "track", "name": "Блок-участок (два прохода за цикл)", "rate": 3600.0 / c2,
              "formula": "3600 / (2 · (L_общ + L_п) / v)" if S2 > 0 else "3600 / (2 · (L_б + L_п) / v)"},
         ]
-        systems.append(pack("GSC", "GSC (погрузка с ортов 26, 27, 28)", links2))
+        if zn:
+            t_za_g = (zn[2] + Lp) / v
+            links2.append({"key": "zone", "name": "Однопутный участок у С-20", "rate": 3600.0 / t_za_g,
+                           "formula": "3600 / t_зан,GSC,  t_зан,GSC = (L_уч + L_п) / v"})
+        gsc_pack = pack("GSC", "GSC (погрузка с ортов 26, 27, 28)", links2)
+        if zn:
+            # состав SLC держит участок от входа до выхода с поста; проезды GSC (приоритет гружёных) уменьшают время участка
+            t_za_s = 2.0 * la + lb + (zn[0] + zn[1] + Lp) / v + t_load
+            share_g = min(gsc_pack["trains_ref"] * t_za_g / t_eff, 1.0) if t_eff > 0 else 0.0
+            links.append({"key": "zone", "name": "Однопутный участок у С-20 (пост АТУ и проезд GSC)",
+                          "rate": (1.0 - share_g) * 3600.0 / t_za_s,
+                          "formula": "(1 − N_GSC · t_зан,GSC / T_эф) · 3600 / t_зан,SLC,  t_зан,SLC = 2a + b + (L_уч,п + L_уч,гр + L_п)/v + t_погр.сост"})
+            zone = {"t_slc": t_za_s, "t_gsc": t_za_g, "share_gsc": share_g, "L": zn[2], "L_e": zn[0], "L_g": zn[1], "x_gsc": zn[3]}
+    systems.append(pack("SLC", "SLC (прямая погрузка с АТУ)", links))
+    if dual:
+        systems.append(gsc_pack)
     s0 = systems[0]
     low = next(x for x in links if x["key"] == s0["bottleneck"])
     tonnes_ref = sum(x["tonnes_ref"] for x in systems)
@@ -803,5 +877,6 @@ def scheme(P):
             "plan_shift": pl_all,
             "plan_pct_ref": (tonnes_ref / pl_all) if pl_all else None,
             "systems": systems,
+            "zone": zone,
         },
     }

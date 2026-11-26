@@ -74,6 +74,20 @@ def make_jobs():
              ("dual-slow", dict(dual, n_loco=10, n_loco_gsc=5, k_v=0.4, n_posts_gsc=4), "shift"),
              ("roles-only-idle", dict(lan, n_loco=5, n_loco_rez=2, n_loco_rem=1), "shift"),
              ("roles-all-gsc", dict(dual, n_loco=4, n_loco_gsc=4), "shift")]
+    # однопутный участок у С-20: пост SLC держит участок, груженые GSC ждут (задание 26.11.2026)
+    zone = dict(dual, L_gruz_gsc=3242.3, L_por_gsc=4174.7, x_obsh_g_gsc=1727.8, x_obsh_p_gsc=2753.1,
+                L_atu=254.0, L_atu_e=75.0, L_atu_g=179.0, x_atu_gsc=975.3)
+    jobs += [("zone-default", dict(zone, n_loco=9, n_loco_gsc=3, n_loco_rez=1), "shift"),
+             ("zone-day", dict(zone, n_loco=9, n_loco_gsc=3, n_loco_rez=1), "day"),
+             ("zone-many-slc", dict(zone, n_loco=12, n_loco_gsc=3), "shift"),
+             ("zone-one-gsc", dict(zone, n_loco=7, n_loco_gsc=1, n_loco_rem=1), "day"),
+             ("zone-slow", dict(zone, n_loco=9, n_loco_gsc=4, k_v=0.4), "shift"),
+             ("zone-two-blocks", dict(zone, n_loco=9, n_loco_gsc=3, n_blocks=2), "shift"),
+             ("zone-twenty-blocks", dict(zone, n_loco=9, n_loco_gsc=3, n_blocks=20), "shift"),
+             ("zone-kdrv2", dict(zone, n_loco=9, n_loco_gsc=3, kdrv_gsc=2), "shift"),
+             ("zone-ktg-low-day", dict(zone, n_loco=9, n_loco_gsc=3, ktg=0.4), "day"),
+             ("zone-no-loop", dict(zone, n_loco=9, n_loco_gsc=3, L_razm=20.0), "shift"),
+             ("zone-off-two-posts", dict(zone, n_loco=9, n_loco_gsc=3, n_posts=2), "shift")]
     rnd = random.Random(20261024)
     meta = PR.meta()
     for i in range(40):

@@ -176,3 +176,17 @@ def cycle_analytic_gsc(p: dict) -> float:
     lg, le, _ = lanes_gsc(p)
     return (gsc_spot_time(p) + gsc_load_time(p) + p["t_unload"]
             + (lg + le) / v + 2.0 * stop_loss(v, p["a"], p["b"]))
+
+
+def zone_atu(p: dict):
+    """Однопутный участок у С-20: (часть порожнего пути SLC, часть гружёного пути SLC, длина для GSC, вход на гружёном пути GSC).
+
+    Участок действует при двух системах, общем участке, одном посте SLC (прямая погрузка с АТУ) и всех четырёх
+    длинах больше нуля; иначе None и движение считается как раньше."""
+    ze, zg, lz, xz = p.get("L_atu_e", 0.0), p.get("L_atu_g", 0.0), p.get("L_atu", 0.0), p.get("x_atu_gsc", 0.0)
+    if not (ze > 0 and zg > 0 and lz > 0 and xz > 0):
+        return None
+    if int(p["n_posts"]) != 1 or fleet(p)["gsc"] <= 0 or lanes(p)[2] <= 0:
+        return None
+    return ze, zg, lz, xz
+

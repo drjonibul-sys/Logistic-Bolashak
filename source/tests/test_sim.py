@@ -319,6 +319,50 @@ class TestDualSystems(unittest.TestCase):
         self.assertEqual(c["plan_shift"], 2880.0)
         self.assertEqual(len(scheme(dict(self.DUAL, n_loco_gsc=0))["capacity"]["systems"]), 1)
 
+    ZONE = dict(L_atu=254.0, L_atu_e=75.0, L_atu_g=179.0, x_atu_gsc=975.3)
+
+    def test_atu_zone_gsc_waits_for_slc_loading(self):
+        """Однопутный участок у С-20: пока состав SLC стоит на посту, груженый GSC на участок не входит (26.11.2026)."""
+        from sim import engine as E
+        p = dict(self.DUAL, n_loco=9, n_loco_gsc=3, n_loco_rez=1, n_loco_rem=0, **self.ZONE)
+        seen, bad = [0], []
+        orig = E.Engine.grant
+
+        def grant(eng, l, j):
+            B = eng.lane(l).blocks[j]
+            if B is eng.za and l.sys == 1:
+                seen[0] += 1
+                if eng.posts[0] is not None or B.holder not in (None, l):
+                    bad.append((eng.t, l.id))
+            if B is eng.za and l.sys == 0 and l.loaded is False and B.holder not in (None, l):
+                bad.append((eng.t, l.id))
+            orig(eng, l, j)
+        E.Engine.grant = grant
+        try:
+            r = simulate(p, "shift")
+        finally:
+            E.Engine.grant = orig
+        self.assertGreater(seen[0], 10, "груженые составы GSC должны проходить участок")
+        self.assertEqual(bad, [])
+        self.assertFalse(r["checks"]["deadlock"])
+        self.assertAlmostEqual(r["checks"]["balance_diff"], 0.0, 6)
+
+    def test_atu_zone_costs_throughput(self):
+        base = simulate(dict(self.DUAL, n_loco=9, n_loco_gsc=3, n_loco_rez=1, n_loco_rem=0), "shift")
+        zone = simulate(dict(self.DUAL, n_loco=9, n_loco_gsc=3, n_loco_rez=1, n_loco_rem=0, **self.ZONE), "shift")
+        self.assertLess(zone["kpi"]["tonnes"], base["kpi"]["tonnes"])
+        sc = scheme(dict(self.DUAL, n_loco=9, n_loco_gsc=3, n_loco_rez=1, n_loco_rem=0, **self.ZONE))
+        z = sc["capacity"]["zone"]
+        self.assertGreater(z["t_slc"], z["t_gsc"])
+        self.assertTrue(any(x["key"] == "zone" for x in sc["capacity"]["links"]))
+        self.assertAlmostEqual(sc["capacity"]["tonnes_ref"], sum(x["tonnes_ref"] for x in sc["capacity"]["systems"]), 6)
+
+    def test_atu_zone_off_without_direct_post(self):
+        from sim import kinematics as K
+        self.assertIsNone(K.zone_atu(dict(self.DUAL, n_posts=2, **self.ZONE)))
+        self.assertIsNone(K.zone_atu(dict(self.DUAL, n_loco_gsc=0, **self.ZONE)))
+        self.assertIsNone(K.zone_atu(dict(self.DUAL, L_atu_e=0.0, **{k: v for k, v in self.ZONE.items() if k != "L_atu_e"})))
+
     def test_legacy_unchanged(self):
         d = PR.defaults()
         r = simulate(d, "shift")

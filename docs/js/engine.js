@@ -94,6 +94,13 @@
       const lg = p.L_gruz_gsc > 0 ? p.L_gruz_gsc : l0[0], le = p.L_por_gsc > 0 ? p.L_por_gsc : l0[1];
       return [lg, le, l0[2] > 0 ? Math.min(l0[2], lg, le) : 0];
     },
+    /* однопутный участок у С-20: [порожний путь SLC, гружёный путь SLC, длина для GSC, вход на гружёном пути GSC] или null */
+    zoneAtu(p) {
+      const ze = p.L_atu_e || 0, zg = p.L_atu_g || 0, lz = p.L_atu || 0, xz = p.x_atu_gsc || 0;
+      if (!(ze > 0 && zg > 0 && lz > 0 && xz > 0)) return null;
+      if (Math.trunc(p.n_posts) !== 1 || K.fleet(p).gsc <= 0 || K.lanes(p)[2] <= 0) return null;
+      return [ze, zg, lz, xz];
+    },
     cycleAnalyticGsc(p) {
       const v = K.speedMs(p.v_kmh, p.k_v);
       const ln = K.lanesGsc(p);
@@ -180,13 +187,34 @@
     for (let i = 0; i < nbb; i++) out.push([b / nbb, false]);
     return out;
   }
+  /* несколько общих участков в одной полосе (sim/engine.py: _split_multi): segs — [начало, длина, признак], признак true или 'za' */
+  function splitMulti(L, segs, nb) {
+    segs = segs.slice().sort((a, b) => a[0] - b[0]);
+    let cur = 0;
+    const gaps = [], keep = [];
+    segs.forEach(sg => {
+      const xs = Math.min(Math.max(sg[0], cur), L);
+      const S = Math.min(sg[1], L - xs);
+      gaps.push(xs - cur); keep.push([S, sg[2]]);
+      cur = xs + S;
+    });
+    gaps.push(L - cur);
+    const f = gaps.reduce((a, b) => a + b, 0), nf = Math.max(nb - segs.length, 0);
+    const cnt = gaps.map(g => (f > 0 && g > 1e-9) ? Math.max(1, Math.floor(nf * g / f + 0.5)) : 0);
+    const out = [];
+    gaps.forEach((g, i) => {
+      for (let k = 0; k < cnt[i]; k++) out.push([g / cnt[i], false]);
+      if (i < keep.length) out.push(keep[i]);
+    });
+    return out;
+  }
   const lanePos = parts => { const pos = [0]; parts.forEach(p => pos.push(pos[pos.length - 1] + p[0])); return pos; };
 
   class Lane {
     constructor(L, Lpath, parts, shared, blocks) {
       this.L = L;
       this.len = parts.map(p => p[0]);
-      this.blocks = blocks || parts.map(p => (p[1] ? shared : new Block()));
+      this.blocks = blocks || parts.map(p => (p[1] ? shared[p[1]] : new Block()));
       const pos = lanePos(parts), scale = Lpath / L;
       this.eq = pos.map(x => x * scale);
       this.eq[this.eq.length - 1] = Lpath;
@@ -219,11 +247,16 @@
       this.nb = Math.trunc(P.n_blocks);
       this.Lb = P.L_path / this.nb;
       const ln = K.lanes(P), Lg = ln[0], Le = ln[1], S = ln[2];
-      const pg = splitLane(Lg, P.x_obsh_g, S, this.nb), pe = splitLane(Le, P.x_obsh_p, S, this.nb);
       this.sharedMode = S > 0;
       const fl = K.fleet(P);
       this.fleet = fl;
       const dual = fl.gsc > 0;
+      const zn = dual ? K.zoneAtu(P) : null;
+      let pg, pe;
+      if (zn) {
+        pg = splitMulti(Lg, [[0, zn[1], 'za'], [P.x_obsh_g || 0, S, true]], this.nb);
+        pe = splitMulti(Le, [[0, zn[0], 'za'], [P.x_obsh_p || 0, S, true]], this.nb);
+      } else { pg = splitLane(Lg, P.x_obsh_g, S, this.nb); pe = splitLane(Le, P.x_obsh_p, S, this.nb); }
       this.Lp = K.trainLength(P.L_loco, Math.trunc(P.n_wagons), P.L_wag);
       this.capLoop = K.loopCapacity(P.L_razm, this.Lp, P.L_zap);
       this.lossA = K.accelLoss(this.v, P.a);
@@ -233,11 +266,14 @@
         const l2 = K.lanesGsc(P);
         const xg2 = P.x_obsh_g_gsc > 0 ? P.x_obsh_g_gsc : (P.x_obsh_g || 0);
         const xe2 = P.x_obsh_p_gsc > 0 ? P.x_obsh_p_gsc : (P.x_obsh_p || 0);
-        specs.push([l2[0], l2[1], splitLane(l2[0], xg2, l2[2], this.nb), splitLane(l2[1], xe2, l2[2], this.nb)]);
+        const pg2 = zn ? splitMulti(l2[0], [[zn[3], zn[2], 'za'], [xg2, l2[2], true]], this.nb) : splitLane(l2[0], xg2, l2[2], this.nb);
+        specs.push([l2[0], l2[1], pg2, splitLane(l2[1], xe2, l2[2], this.nb)]);
       }
       const lanes = [];
+      this.za = null;
       if (this.sharedMode) {
-        const sh = new Block();
+        const sh = { true: new Block() };
+        if (zn) { this.za = new Block(); sh.za = this.za; }
         this.blocks = [];
         specs.forEach(sp => {
           const g = new Lane(sp[0], P.L_path, sp[2], sh), e = new Lane(sp[1], P.L_path, sp[3], sh);
@@ -326,6 +362,13 @@
         if (ns !== null) this.at(ns, this.wantPost, [l]);
         return;
       }
+      if (this.za !== null && l.sys === 0 && l.holding !== this.za) {
+        // пост С-20 стоит на однопутном участке: состав входит на него, как на блок-участок, и ждёт, пока участок свободен
+        this.setState(l, 'ожидание блок-участка');
+        l.dir = -1; l.node = 1; l.pending = this.lossA;
+        this.requestBlock(l, 0, 1);
+        return;
+      }
       this.setState(l, 'ожидание поста');
       const s = this.sys[l.sys];
       s.postQ.push(l);
@@ -335,6 +378,10 @@
     sendOff(l) {
       const ns = this.nextWindowStart(this.t);
       this.setState(l, 'вне работы');
+      if (this.za !== null && l.holding === this.za) {
+        this.at(this.t, this.releaseBlock, [l.holding, l]);
+        l.holding = null;
+      }
       if (ns !== null) this.at(ns, this.wantPost, [l]);
     }
     windowEnd() {
@@ -406,7 +453,7 @@
     requestBlock(l, j, node) {
       const ln = this.lane(l);
       const B = ln.blocks[j];
-      if (B.holder === null) { this.grant(l, j); return; }
+      if (B.holder === null || B.holder === l) { this.grant(l, j); return; }
       B.waiters.push([l, this.t, j]);
       if (node === 0 || node === ln.m) {
         this.setState(l, 'ожидание блок-участка');
@@ -428,7 +475,8 @@
       const t = this.t;
       const ln = this.lane(l);
       const B = ln.blocks[j];
-      B.holder = l; B.occStart = t;
+      if (B.holder !== l) B.occStart = t;
+      B.holder = l;
       if (l.parkedAt !== null) { ln.parked[l.parkedAt] -= 1; l.parkedAt = null; }
       const pend = l.pending;
       l.pending = 0;
@@ -436,7 +484,7 @@
       const dest = d === 1 ? j + 1 : j;
       const endDest = d === 1 ? dest === ln.m : dest === 0;
       const tArr = t + pend + ln.len[j] / this.v + (endDest ? this.lossB : 0);
-      if (l.holding !== null) this.at(t + pend + this.Lp / this.v, this.releaseBlock, [l.holding, l]);
+      if (l.holding !== null && l.holding !== B) this.at(t + pend + this.Lp / this.v, this.releaseBlock, [l.holding, l]);
       l.holding = B;
       this.setState(l, l.loaded ? 'ход гружёный' : 'ход порожний');
       l.destX = ln.eq[dest];
@@ -448,8 +496,12 @@
       const d = l.dir;
       const ln = this.lane(l);
       if ((d === 1 && node === ln.m) || (d === -1 && node === 0)) {
-        this.at(this.t + this.Lp / this.v, this.releaseBlock, [l.holding, l]);
-        l.holding = null;
+        if (this.za !== null && d === -1 && l.sys === 0 && l.holding === this.za && this.inWindow(this.t)) {
+          // пост С-20 внутри однопутного участка: состав держит его до отправления гружёным
+        } else {
+          this.at(this.t + this.Lp / this.v, this.releaseBlock, [l.holding, l]);
+          l.holding = null;
+        }
         if (d === 1) this.wantKdrv(l); else this.wantPost(l);
       } else {
         const nj = d === 1 ? node : node - 1;
@@ -698,9 +750,9 @@
   }
 
   /* Занятость блок-участка за цикл (sim/engine.py: _track_occ): [t_цикл, t_зан, блоки гружёного пути] */
-  function trackOcc(P, Lg, Le, S, xg, xe, nb, Lp, v) {
+  function trackOcc(P, Lg, Le, S, xg, xe, nb, Lp, v, pgIn, peIn) {
     if (S > 0) {
-      const pg = splitLane(Lg, xg, S, nb), pe = splitLane(Le, xe, S, nb);
+      const pg = pgIn || splitLane(Lg, xg, S, nb), pe = peIn || splitLane(Le, xe, S, nb);
       const free = pg.concat(pe).filter(x => !x[1]).map(x => x[0]);
       const freeMax = free.length ? Math.max.apply(null, free) : 0;
       return [Math.max(2 * (S + Lp) / v, (freeMax + Lp) / v), (S + Lp) / v, pg];
@@ -724,7 +776,10 @@
     const mTrain = n * P.m_wag;
     const tEff = (P.T_sm - P.t_to_start - P.t_to_end) * P.ktg;
     const fl = K.fleet(P), dual = fl.gsc > 0, pl = K.plans(P);
-    const occ = trackOcc(P, Lg, Le, S, P.x_obsh_g || 0, P.x_obsh_p || 0, nb, Lp, v);
+    const zn = dual ? K.zoneAtu(P) : null;
+    const pgz = zn ? splitMulti(Lg, [[0, zn[1], 'za'], [P.x_obsh_g || 0, S, true]], nb) : null;
+    const pez = zn ? splitMulti(Le, [[0, zn[0], 'za'], [P.x_obsh_p || 0, S, true]], nb) : null;
+    const occ = trackOcc(P, Lg, Le, S, P.x_obsh_g || 0, P.x_obsh_p || 0, nb, Lp, v, pgz, pez);
     const tCycOcc = occ[0], tOcc = occ[1], pg = occ[2];
     const links = [
       { key: 'locos', name: 'Электровозы Ferrit', rate: fl.slc * 3600 / cyc, formula: 'n_ЭВ · 3600 / t_ц' },
@@ -739,18 +794,37 @@
       const tr = lw.rate * tEff / 3600;
       return { key, name, links: lk, bottleneck: lw.key, bottleneck_name: lw.name, formula: lw.formula, rate_min: lw.rate, trains_ref: tr, tonnes_ref: tr * mTrain };
     };
-    const systems = [pack('SLC', 'SLC (прямая погрузка с АТУ)', links)];
+    const systems = [];
+    let zone = null, gscPack = null;
     if (dual) {
       const l2 = K.lanesGsc(P);
-      const c2 = trackOcc(P, l2[0], l2[1], l2[2], P.x_obsh_g_gsc || P.x_obsh_g || 0, P.x_obsh_p_gsc || P.x_obsh_p || 0, nb, Lp, v)[0];
+      const xg2 = P.x_obsh_g_gsc || P.x_obsh_g || 0, xe2 = P.x_obsh_p_gsc || P.x_obsh_p || 0;
+      const pg2 = zn ? splitMulti(l2[0], [[zn[3], zn[2], 'za'], [xg2, l2[2], true]], nb) : null;
+      const c2 = trackOcc(P, l2[0], l2[1], l2[2], xg2, xe2, nb, Lp, v, pg2, null)[0];
       const tLoad2 = K.gscSpotTime(P) + K.gscLoadTime(P);
-      systems.push(pack('GSC', 'GSC (погрузка с ортов 26, 27, 28)', [
+      const links2 = [
         { key: 'locos', name: 'Электровозы Ferrit (GSC)', rate: fl.gsc * 3600 / K.cycleAnalyticGsc(P), formula: 'n_ЭВ,GSC · 3600 / t_ц' },
         { key: 'posts', name: 'Орты 26, 27, 28 (скреперные лебёдки)', rate: P.n_posts_gsc * 3600 / tLoad2, formula: 'n_пост · 3600 / (t_пос + n · t_в)' },
         { key: 'kdrv', name: Math.trunc(P.kdrv_gsc) === 1 ? 'КДРВ №1' : 'КДРВ №2 (общий)', rate: 3600 / P.t_unload, formula: '3600 / t_разгр' },
         { key: 'track', name: 'Блок-участок (два прохода за цикл)', rate: 3600 / c2, formula: l2[2] > 0 ? '3600 / (2 · (L_общ + L_п) / v)' : '3600 / (2 · (L_б + L_п) / v)' },
-      ]));
+      ];
+      let tZaG = 0;
+      if (zn) {
+        tZaG = (zn[2] + Lp) / v;
+        links2.push({ key: 'zone', name: 'Однопутный участок у С-20', rate: 3600 / tZaG, formula: '3600 / t_зан,GSC,  t_зан,GSC = (L_уч + L_п) / v' });
+      }
+      gscPack = pack('GSC', 'GSC (погрузка с ортов 26, 27, 28)', links2);
+      if (zn) {
+        // состав SLC держит участок от входа до выхода с поста; проезды GSC (приоритет гружёных) уменьшают время участка
+        const tZaS = 2 * la + lb + (zn[0] + zn[1] + Lp) / v + tLoad;
+        const shareG = tEff > 0 ? Math.min(gscPack.trains_ref * tZaG / tEff, 1) : 0;
+        links.push({ key: 'zone', name: 'Однопутный участок у С-20 (пост АТУ и проезд GSC)', rate: (1 - shareG) * 3600 / tZaS,
+          formula: '(1 − N_GSC · t_зан,GSC / T_эф) · 3600 / t_зан,SLC,  t_зан,SLC = 2a + b + (L_уч,п + L_уч,гр + L_п)/v + t_погр.сост' });
+        zone = { t_slc: tZaS, t_gsc: tZaG, share_gsc: shareG, L: zn[2], L_e: zn[0], L_g: zn[1], x_gsc: zn[3] };
+      }
     }
+    systems.push(pack('SLC', 'SLC (прямая погрузка с АТУ)', links));
+    if (dual) systems.push(gscPack);
     const s0 = systems[0];
     const trainsRef = sum(systems.map(x => x.trains_ref)), tonnesRef = sum(systems.map(x => x.tonnes_ref));
     let nodes = [];
@@ -779,7 +853,7 @@
         required_rate: tEff > 0 ? pl[2] / (mTrain * tEff / 3600) : null,
         trains_ref: trainsRef, tonnes_ref: tonnesRef, tail_trains: Math.trunc(P.n_posts) + (dual ? Math.trunc(P.n_posts_gsc) : 0),
         plan_shift: pl[2], plan_pct_ref: pl[2] ? tonnesRef / pl[2] : null,
-        systems,
+        systems, zone,
       },
     };
   }

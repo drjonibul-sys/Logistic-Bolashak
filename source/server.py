@@ -110,6 +110,7 @@ def reference_values():
             mine.update({
                 "L_gruz_gsc": gs["Lg"], "L_por_gsc": gs["Le"], "x_obsh_g_gsc": gs["xg"], "x_obsh_p_gsc": gs["xe"],
                 "n_posts_gsc": int(round(gs["posts"])), "plan_slc": ln["plan"]["slc"], "plan_gsc": ln["plan"]["gsc"],
+                "L_atu": ln["atu"]["Lz"], "L_atu_e": ln["atu"]["Le"], "L_atu_g": ln["atu"]["Lg"], "x_atu_gsc": ln["atu"]["xz"],
                 "n_loco_gsc": int(round(ln["fleet"]["gsc"])), "n_loco_rez": int(round(ln["fleet"]["rez"])),
                 "n_loco_rem": int(round(ln["fleet"]["rem"])), "n_loco_por": int(round(ln["fleet"]["por"])),
             })
