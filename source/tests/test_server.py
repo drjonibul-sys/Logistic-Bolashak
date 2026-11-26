@@ -176,6 +176,14 @@ class TestServer(ServerCase):
         self.assertEqual(c.call("POST", "/api/run", {"kind": "week"})[0], 400)
         self.assertEqual(c.call("POST", "/api/run", {"kind": "shift", "mode": "stochastic"})[0], 422)
 
+    def test_03z_plan_shift_is_sum_of_systems(self):
+        c = Client()
+        v = c.call("GET", "/api/reference")[1]["values"]
+        self.assertEqual(v["plan_shift"], v["plan_slc"] + v["plan_gsc"])
+        c.call("PUT", "/api/reference", {"values": dict(v, plan_slc=1000.0, plan_gsc=500.0), "edited": ["plan_slc", "plan_gsc"]})
+        self.assertEqual(c.call("GET", "/api/reference")[1]["values"]["plan_shift"], 1500.0)
+        c.call("POST", "/api/reference/reset", {})
+
     def test_04_user_cannot_edit(self):
         c = Client()
         vals = c.call("GET", "/api/reference")[1]["values"]

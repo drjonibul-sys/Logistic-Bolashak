@@ -127,6 +127,9 @@ def reference_values():
         for k in ("plan_slc", "plan_gsc"):
             if k in fl:
                 vals[k] = fl[k]
+    # общий план смены = план SLC + план GSC (вводятся вручную); если оба равны 0, действует plan_shift
+    if vals.get("plan_slc", 0) + vals.get("plan_gsc", 0) > 0:
+        vals["plan_shift"] = min(vals["plan_slc"] + vals["plan_gsc"], 20000.0)
     clean, errors = PR.validate(vals)
     return clean if not errors else PR.defaults()
 

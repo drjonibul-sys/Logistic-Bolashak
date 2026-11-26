@@ -127,6 +127,8 @@
       Object.assign(vals, { n_loco: fl.roles.length, n_loco_gsc: cnt('GSC'), n_loco_rez: cnt('rez'), n_loco_rem: cnt('rem'), n_loco_por: cnt('por') });
       ['plan_slc', 'plan_gsc'].forEach(k => { if (k in fl) vals[k] = fl[k]; });
     }
+    // общий план смены = план SLC + план GSC (вводятся вручную); если оба равны 0, действует plan_shift
+    if (vals.plan_slc + vals.plan_gsc > 0) vals.plan_shift = Math.min(vals.plan_slc + vals.plan_gsc, 20000);
     const v = LG.validate(vals);
     return v.errors.length ? LG.defaults() : v.clean;
   }

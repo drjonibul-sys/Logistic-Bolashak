@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Проходка −480 с электровозами · Логистика гор. −480</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%231f6fb5'/%3E%3Cpath d='M3 11h10M5 11V6h6v5' stroke='white' fill='none' stroke-width='1.5'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1f6fb5">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Логистика">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+</head>
+<body data-page="drive480">
+<main id="page">
+<h1>Проходка на гор. −480 с локомотивной откаткой</h1>
+<p class="lead">Горнопроходческие работы на гор. −480 м буровой установкой Epiroc Boomer T1D, ПДМ 1 м³ и откаткой вагонов электровозом. Основное крепление — рамы СВП-27 с шагом от 1 до 0,5 м (в самых негативных условиях 0,25 м); в плохих условиях добавляются опережающее крепление проколами L = 4 м, подкрепка рамами СВП-22 и забутовка лесом; возможны тросовая крепь и бетон по полному сечению без почвы. Учтена прокладка капитальных коммуникаций: рельсовый путь, водопровод и сжатый воздух. Условия, сечение, длина заходки и виды крепления подставляются автоматически и корректируются вручную. Смены и окна ВР — как на странице <a href="drive.html">«Проходка»</a>.</p>
+<section class="card">
+  <div class="row">
+    <label>Режим
+      <select id="rdMode"><option value="auto">Автоматический</option><option value="manual">Ручной</option></select>
+    </label>
+    <label>Горизонт
+      <select id="rdHor"><option value="shift">Смена</option><option value="day">Сутки (две смены)</option><option value="month">Месяц (30 суток)</option></select>
+    </label>
+    <span class="msg" id="rdMsg" role="status"></span>
+  </div>
+  <p class="hint" id="rdHint"></p>
+</section>
+<section class="card" id="rdPass">
+  <h3>Условия, сечение, заходка и крепление</h3>
+  <div class="row">
+    <label>Горно-геологические условия (шаг рам СВП-27)<select id="rdCond"></select></label>
+    <button class="btn" id="rdReset" type="button">Сбросить поправки</button><span class="msg" id="rdPsMsg" role="status"></span>
+  </div>
+  <div class="row" id="rdSup" role="group" aria-label="Виды крепления и коммуникации"></div>
+  <p class="hint">Колонка «Авто» — значение из выбранных условий или справочника; поле «Принято» с вашей поправкой подсвечено и сильнее авто. Виды крепления и коммуникации включаются по условиям и переключаются вручную. Поправки хранятся в этом браузере.</p>
+  <div class="scroll"><table id="rdTbl" class="pass"></table></div>
+  <div class="scroll"><table id="rdQty" class="pass"></table></div>
+</section>
+<section class="card" id="rdArm">
+  <h3>Плечо электровоза по чертежу гор. −480</h3>
+  <div class="row">
+    <label>Забой <select id="rdFrom"></select></label>
+    <label>Пункт разгрузки <select id="rdTo"></select></label>
+    <label>k_изв <input type="number" id="rdK" min="1" max="2" step="0.05"></label>
+    <button class="btn" id="rdCalc" type="button">Рассчитать плечо по чертежу</button>
+    <button class="btn" id="rdClr" type="button">Вернуть плечо из справочника</button>
+  </div>
+  <p class="hint" id="rdArmHint"></p>
+</section>
+<section class="card" id="rdManual" hidden>
+  <h3>Ручной ввод: количества и минуты по сменам</h3>
+  <div class="row">
+    <label>Смен в цикле <select id="rdShifts"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></label>
+    <button class="btn" id="rdFill" type="button">Заполнить из автоматического расчёта</button><span class="msg" id="rdMMsg" role="status"></span>
+  </div>
+  <p class="hint">Пустое поле «мин» берёт норму (в подсказке поля). Вспомогательные работы в автоматическом режиме — остаток смены.</p>
+  <div class="scroll"><table id="rdManTbl"></table></div>
+</section>
+<div id="rdOut"></div>
+</main>
+<script src="js/blocks.js"></script>
+<script src="js/drawings.js"></script>
+<script src="js/drive.js"></script>
+<script src="js/drive480.js"></script>
+<script src="js/params-data.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/local-api.js"></script>
+<script src="js/pwa.js"></script>
+<script src="js/updater.js"></script>
+<script src="js/common.js"></script>
+<script src="js/p-drive480.js"></script>
+</body>
+</html>

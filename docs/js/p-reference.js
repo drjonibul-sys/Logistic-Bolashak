@@ -29,7 +29,19 @@ function renderRef() {
   applyRefRole();
 }
 
+/* «План руды в смену» = план SLC + план GSC, если хотя бы один из них задан */
+function syncPlanShift() {
+  const a = $('#refBox input[data-key=plan_slc]'), b = $('#refBox input[data-key=plan_gsc]'), t = $('#refBox input[data-key=plan_shift]');
+  if (!a || !b || !t) return;
+  const sum = (parseFloat(a.value) || 0) + (parseFloat(b.value) || 0);
+  const auto = sum > 0;
+  if (auto) t.value = Math.min(sum, 20000);
+  t.disabled = auto;
+  t.title = auto ? 'Считается автоматически: план SLC + план GSC' : '';
+}
+
 function onEdit() {
+  syncPlanShift();
   let dirty = 0;
   $$('#refBox input').forEach(i => {
     i.classList.toggle('changed', differs(i.value, i.dataset.def));
@@ -58,6 +70,7 @@ function applyFilter() {
 
 function applyRefRole() {
   $$('#refBox input').forEach(i => { i.disabled = i.dataset.key === 'L_path'; });
+  syncPlanShift();
   $('#refBtns').hidden = false;
   $('#refHint').textContent = 'Все значения можно править: допущения помечены и ждут подтверждения шахты. Длина пути L_путь считается из выработок блока −480 и здесь не правится. После сохранения выполните новый расчёт.';
 }
