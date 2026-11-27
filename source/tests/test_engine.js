@@ -651,3 +651,27 @@ test('прежний режим: без ролей и планов систем 
   assert.equal(r.derived.plan_total, D.plan_shift);
   assert.ok(r.locos.every(l => l.role === 'SLC'));
 });
+
+/* ---------- забои в работе и бригады (версия 0.17.0) ---------- */
+test('бригады: один забой совпадает с циклом забоя, группировка замедляет круг', () => {
+  const CR = require(path.join(__dirname, '..', 'static', 'js', 'crews.js'));
+  const DV = require(path.join(__dirname, '..', 'static', 'js', 'drive.js'));
+  const a = DV.auto(D, DV.emptyPass(), 350), S = DV.summarize(a, 86400, D);
+  const fc = CR.faceCycle(D, a, S);
+  const faces = { A: fc, B: fc, C: fc };
+  const st = CR.clean(null);
+  const one = CR.crew({ faces: ['A'], units: {}, t_move: 20 }, faces);
+  near(one.T_round, fc.T, 1e-9, 'один забой');
+  near(one.per_day, S.per_day, 1e-9, 'проходка одного забоя');
+  const three = CR.crew({ faces: ['A', 'B', 'C'], units: {}, t_move: 20 }, faces);
+  assert.ok(three.T_round > one.T_round, 'три забоя на одном комплекте медленнее');
+  assert.ok(three.per_day < 3 * one.per_day + 1e-9, 'выпуск трёх забоев не выше утроенного');
+  const more = CR.crew({ faces: ['A', 'B', 'C'], units: { boomer: 3, pdm: 3, loader: 3, spray: 3, crew: 3, cab: 3 }, t_move: 20 }, faces);
+  assert.ok(more.T_round <= three.T_round + 1e-9, 'больше техники не хуже');
+  const sm = CR.summary(Object.assign(st, { crews: [{ id: 1, name: 'x', people: 1, t_move: 0, units: { boomer: 5 }, faces: ['A'] }] }), faces);
+  assert.deepEqual(sm.free.sort(), ['B', 'C']);
+  assert.ok(sm.over.indexOf('boomer') >= 0, 'превышение парка');
+  // забой не в работе снимается из бригады, дубль забоя оставляется один раз
+  const cl = CR.clean({ working: { A: 1 }, crews: [{ id: 1, faces: ['A', 'B'] }, { id: 2, faces: ['A'] }] });
+  assert.deepEqual(cl.crews[0].faces, ['A']); assert.deepEqual(cl.crews[1].faces, []);
+});

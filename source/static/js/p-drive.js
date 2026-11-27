@@ -71,7 +71,7 @@ function renderArms() {
 }
 
 function bindArms() {
-  const upd = (recalc) => { if (ARMS.mode === 'auto' && recalc) { renderArms(); armsFromDrawings(); } saveArms(); renderArms(); render(); };
+  const upd = (recalc) => { if (ARMS.mode === 'auto' && recalc) { renderArms(); armsFromDrawings(); } saveArms(); renderArms(); render(); renderCrews(); };
   $('#arMode').addEventListener('input', () => { ARMS.mode = $('#arMode').value; upd(true); });
   $('#arName').addEventListener('input', () => { ARMS.name = $('#arName').value; ARMS.nameTouched = true; saveArms(); render(); });
   $('#arPdm').addEventListener('input', () => { ARMS.pdm_L = Math.max(5, parseFloat($('#arPdm').value) || P.d_L_muck); upd(true); });
@@ -83,6 +83,100 @@ function bindArms() {
   $('#arAdd').addEventListener('click', () => { ARMS.haul.push({ name: 'Новый участок', L: 100 }); saveArms(); renderArms(); render(); });
 }
 
+
+/* ---------- забои в работе и бригады ---------- */
+const CR = window.LG_CREWS;
+let CRS = null;
+function saveCrews() { save(CR.KEY, CRS); }
+function loadCrews() { try { return CR.clean(JSON.parse(localStorage.getItem(CR.KEY))); } catch (e) { return CR.clean(null); } }
+const crFaces = () => DR.nodes(ARMS.auto.hid).filter(n => n.face);
+const faceName = id => { const n = crFaces().find(x => x.id === id); return n ? n.name : id; };
+function destId() {
+  const A = ARMS.auto; if (A.to) return A.to;
+  const d = DR.nodes(A.hid).filter(n => n.dest)[0]; return d ? d.id : '';
+}
+/* цикл забоя по паспорту; плечо ПДМ гор. −402 берётся по чертежу для каждого забоя */
+function faceCalcs() {
+  const out = {}, A = ARMS.auto;
+  crFaces().map(n => n.id).filter(f => CRS.working[f]).forEach(f => {
+    let L = ARMS.pdm_L;
+    if (A.hid === 'm402') {
+      const r = DR.arms({ hid: 'm402', from: f, to: destId() }, { k_dev: A.k || P.d_k_dev, atu: ATU, toC1: false, pdm_L: ARMS.pdm_L });
+      if (!r.error && r.pdm) L = r.pdm.L;
+    }
+    const pass = JSON.parse(JSON.stringify(PASS)); pass.ov = pass.ov || {}; pass.ov.arm = Math.round(L * 10) / 10;
+    const a = D.auto(P, pass, L), S = D.summarize(a, 86400, P);
+    out[f] = Object.assign(CR.faceCycle(P, a, S), { arm: L });
+  });
+  return out;
+}
+function crewOpts(cur, f) {
+  return '<option value="">— свободен —</option>' + CRS.crews.map(c => `<option value="${c.id}"${c.faces.indexOf(f) >= 0 ? ' selected' : ''}>${esc(c.name)}</option>`).join('');
+}
+function renderCrews() {
+  if (!CRS) return;
+  CRS = CR.clean(CRS);
+  const faces = crFaces(), FC = faceCalcs(), sm = CR.summary(CRS, FC);
+  $('#crFaces').innerHTML = faces.map(n => `<label class="inline"><input type="checkbox" data-w="${esc(n.id)}"${CRS.working[n.id] ? ' checked' : ''}> ${esc(n.name.replace(/^Забой: /, ''))}</label>`).join('');
+  const fl = D.RES.map(r => `<tr><td class="l">${esc(r.name)}</td><td><input type="number" min="0" max="20" step="1" data-fl="${r.id}" value="${CRS.fleet[r.id]}" aria-label="Парк: ${esc(r.name)}"></td><td>${sm.used[r.id]}</td></tr>`).join('');
+  $('#crFleet').innerHTML = '<thead><tr><th class="l">Машина</th><th>В парке, шт.</th><th>Назначено бригадам, шт.</th></tr></thead><tbody>' + fl + '</tbody>';
+  $('#crFleetN').textContent = sm.over.length ? 'превышение парка: ' + sm.over.map(id => D.RES.find(r => r.id === id).name.split(' (')[0]).join(', ') : '';
+  let h = '';
+  CRS.crews.forEach((c, ci) => {
+    const x = sm.crews[ci];
+    h += `<div class="card" data-crew="${c.id}"><div class="row"><label>Название <input type="text" data-cf="name" maxlength="40" value="${esc(c.name)}"></label>` +
+      `<label>Численность, чел. <input type="number" data-cf="people" min="0" max="60" step="1" value="${c.people}"></label>` +
+      `<label>Перегон техники между забоями, мин <input type="number" data-cf="t_move" min="0" max="480" step="5" value="${c.t_move}"></label>` +
+      `<button class="btn danger" type="button" data-cdel="${c.id}">Удалить бригаду</button></div>`;
+    h += '<div class="row">' + D.RES.map(r => `<label>${esc(r.name.split(' (')[0])}, шт. <input type="number" min="1" max="10" step="1" data-cu="${r.id}" value="${CR.unitsOf(c, r.id)}"></label>`).join('') + '</div>';
+    h += '<div class="row" role="group" aria-label="Забои бригады">' + (c.faces.length ? c.faces.map(f => `<span class="badge">${esc(faceName(f).replace(/^Забой: /, ''))}</span>`).join(' ') : '<span class="msg">Забои не назначены: выберите бригаду в таблице ниже.</span>') + '</div>';
+    if (x.k) {
+      const bn = x.bound === 'tech' ? 'технология забоя (цикл)' : D.RES.find(r => r.id === x.bound).name.split(' (')[0];
+      h += `<div class="tiles">${T(fmt(x.T_round / 60, 1) + ' ч', 'круг обслуживания забоев', 'ok')}${T(fmt(x.cycles_day, 2), 'заходок в сутки на забой')}${T(fmt(x.per_day, 2) + ' м', 'проходка бригады в сутки')}${T(fmt(30 * x.per_day, 0) + ' м', 'за месяц (30 суток)')}${T(fmt(x.M_day, 0) + ' т', 'горная масса в сутки')}</div>`;
+      h += `<p class="hint">Лимит круга: ${esc(bn)}. T_кр = max(${fmt(x.T_tech / 60, 1)} ч цикл забоя; ${fmt(x.T_mach / 60, 1)} ч занятость техники) + ${x.k > 1 ? x.k + ' × ' + c.t_move + ' мин перегона' : '0 мин'} = ${fmt(x.T_round / 60, 1)} ч.</p>`;
+    }
+    h += '</div>';
+  });
+  $('#crList').innerHTML = h || '<p class="msg">Бригад нет. Нажмите «Добавить бригаду».</p>';
+  /* таблица назначения: ручная группировка забоев в работе */
+  const w = Object.keys(FC);
+  let t = '<h3>Назначение забоев бригадам</h3>' + (sm.free.length ? `<div class="banner warn">Забои без бригады: ${sm.free.map(f => esc(faceName(f).replace(/^Забой: /, ''))).join(', ')}.</div>` : '') +
+    (sm.over.length ? '<div class="banner err">Назначено техники больше, чем в парке: увеличьте парк или уменьшите число машин у бригад.</div>' : '');
+  if (!w.length) t += '<p class="msg">Забои в работе не отмечены.</p>';
+  else {
+    t += '<div class="scroll"><table><thead><tr><th class="l">Забой в работе</th><th>Плечо ПДМ, м</th><th>Цикл, ч</th><th>Заходка, м</th><th class="l">Бригада</th></tr></thead><tbody>' +
+      w.map(f => { const q = FC[f]; return `<tr><td class="l">${esc(faceName(f).replace(/^Забой: /, ''))}</td><td>${fmt(q.arm, 0)}</td><td>${fmt(q.T / 60, 1)}</td><td>${fmt(q.l, 2)}</td><td class="l"><select data-as="${esc(f)}" aria-label="Бригада забоя">${crewOpts(null, f)}</select></td></tr>`; }).join('') + '</tbody></table></div>';
+    t += '<h3>Итого по участку</h3><div class="tiles">' + T(w.length, 'забоев в работе') + T(sm.crews.filter(x => x.k).length + ' из ' + CRS.crews.length, 'бригад с забоями') +
+      T(fmt(sm.per_day, 2) + ' м', 'проходка в сутки', 'ok') + T(fmt(sm.per_month, 0) + ' м', 'проходка в месяц') + T(fmt(sm.M_day, 0) + ' т', 'горная масса в сутки') + '</div>' +
+      '<p class="hint">Допущения: одна и та же заходка и вид крепления (паспорт ниже) во всех забоях; техника бригады переезжает между забоями за заданное время; сутки = 1440 мин; парк техники по умолчанию условный. Горная масса идёт в откатку по режиму гор. −402 или −480 из блока «Горизонт и плечи».</p>';
+  }
+  $('#crOut').innerHTML = t;
+  $$('#crFaces input').forEach(i => i.addEventListener('change', () => { CRS.working[i.dataset.w] = i.checked ? 1 : 0; saveCrews(); renderCrews(); }));
+  $$('#crFleet input').forEach(i => i.addEventListener('change', () => { CRS.fleet[i.dataset.fl] = Math.max(0, Math.round(+i.value || 0)); saveCrews(); renderCrews(); }));
+  $$('#crList [data-crew]').forEach(card => {
+    const c = CRS.crews.find(z => z.id === +card.dataset.crew);
+    $$('[data-cf]', card).forEach(i => i.addEventListener('change', () => { c[i.dataset.cf] = i.dataset.cf === 'name' ? (i.value.trim() || c.name) : +i.value; saveCrews(); renderCrews(); }));
+    $$('[data-cu]', card).forEach(i => i.addEventListener('change', () => { c.units[i.dataset.cu] = Math.max(1, Math.round(+i.value || 1)); saveCrews(); renderCrews(); }));
+    $('[data-cdel]', card).addEventListener('click', () => { CRS.crews = CRS.crews.filter(z => z !== c); saveCrews(); renderCrews(); });
+  });
+  $$('#crOut [data-as]').forEach(sel => sel.addEventListener('change', () => {
+    const f = sel.dataset.as;
+    CRS.crews.forEach(c => { c.faces = c.faces.filter(x => x !== f); });
+    const c = CRS.crews.find(z => z.id === +sel.value); if (c) c.faces.push(f);
+    saveCrews(); renderCrews();
+  }));
+}
+function bindCrews() {
+  CRS = loadCrews();
+  $('#crAdd').addEventListener('click', () => { CRS.crews.push({ id: CRS.next++, name: 'Бригада ' + (CRS.crews.length + 1), people: 12, t_move: 20, units: {}, faces: [] }); saveCrews(); renderCrews(); setMsg($('#crMsg'), 'Бригада добавлена: назначьте забои в таблице ниже.', 'ok'); });
+  $('#crRest').addEventListener('click', () => {
+    const sm = CR.summary(CRS, faceCalcs());
+    if (!sm.free.length) { setMsg($('#crMsg'), 'Свободных забоев нет.', 'err'); return; }
+    CRS.crews.push({ id: CRS.next++, name: 'Бригада ' + (CRS.crews.length + 1), people: 12, t_move: 20, units: {}, faces: sm.free.slice() });
+    saveCrews(); renderCrews(); setMsg($('#crMsg'), 'Свободные забои собраны в новую бригаду.', 'ok');
+  });
+  $('#crReset').addEventListener('click', () => { CRS = CR.clean(null); saveCrews(); renderCrews(); setMsg($('#crMsg'), 'Бригады сброшены к исходным.', 'ok'); });
+}
 
 /* ---------- паспорт проходки ---------- */
 function plan() { return $('#drMode').value === 'manual' && MAN ? D.manual(P, PASS, MAN, ARMS.pdm_L) : D.auto(P, PASS, ARMS.pdm_L); }
@@ -118,7 +212,7 @@ function renderPass() {
   $$('#psQty input').forEach(i => i.addEventListener('change', () => { const v = num(i.value); if (v == null || i.value === '') delete PASS.q[i.dataset.q]; else PASS.q[i.dataset.q] = Math.max(0, Math.round(v)); savePass(); }));
   $$('#psSup input').forEach(i => i.addEventListener('change', () => { PASS.sup[i.dataset.sup] = i.checked ? 1 : 0; if (PASS.sup[i.dataset.sup] === R.supAuto[i.dataset.sup]) delete PASS.sup[i.dataset.sup]; savePass(); }));
 }
-function savePass() { save(D.PASS_KEY, PASS); renderPass(); renderMan(); render(); }
+function savePass() { save(D.PASS_KEY, PASS); renderPass(); renderMan(); render(); renderCrews(); }
 
 /* ---------- ручной ввод ---------- */
 function renderMan() {
@@ -298,8 +392,8 @@ boot(async () => {
   ARMS = D.armsStored(P);
   PASS = (() => { try { const o = JSON.parse(localStorage.getItem(D.PASS_KEY)); if (o && typeof o === 'object') return Object.assign(D.emptyPass(), o); } catch (e) { /* пусто */ } return D.emptyPass(); })();
   MAN = loadMan();
-  renderArms(); bindArms(); renderPass(); renderMan();
-  const full = () => { renderPass(); renderMan(); render(); };
+  renderArms(); bindArms(); renderPass(); renderMan(); bindCrews(); renderCrews();
+  const full = () => { renderPass(); renderMan(); render(); renderCrews(); };
   $('#drMode').addEventListener('input', () => { saveMode(); renderMan(); render(); });
   $('#drHor').addEventListener('input', render);
   $('#psPreset').addEventListener('input', () => { PASS.preset = $('#psPreset').value; PASS.ov = {}; PASS.q = {}; PASS.sup = {}; save(D.PASS_KEY, PASS); full(); });

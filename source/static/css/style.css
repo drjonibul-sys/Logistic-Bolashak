@@ -236,6 +236,15 @@ details.fold[open] > summary::before { content: "▾"; }
 details.fold[open] > summary { border-bottom: 1px solid var(--line); }
 details.fold > :not(summary) { margin-left: 10px; margin-right: 10px; }
 details.fold > .scroll:last-child, details.fold > .stack:last-child { margin-bottom: 8px; }
+/* Сворачиваемый блок парка техники бригад */
+details.crbox { border: 1px solid var(--line); border-radius: 8px; margin: 8px 0 14px; background: var(--panel); }
+details.crbox > summary { cursor: pointer; padding: 9px 12px; font-size: 14px; list-style: none; display: flex; gap: 6px; align-items: baseline; }
+details.crbox > summary::-webkit-details-marker { display: none; }
+details.crbox > summary::before { content: "▸"; color: var(--accent); display: inline-block; width: 1em; }
+details.crbox[open] > summary::before { content: "▾"; }
+details.crbox[open] > summary { border-bottom: 1px solid var(--line); }
+details.crbox > :not(summary) { margin-left: 10px; margin-right: 10px; }
+details.crbox > .scroll:last-child, details.crbox > .stack:last-child { margin-bottom: 8px; }
 .fold-n { color: var(--muted); font-size: 12.5px; margin-left: auto; }
 table.fcol-off [data-fc] { display: none; }
 button.fold-col { margin: 4px 0; font-size: 13px; }

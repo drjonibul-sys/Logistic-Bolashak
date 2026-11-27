@@ -52,6 +52,16 @@
   <p class="row"><button class="btn" id="arAdd" type="button">Добавить участок</button><span class="msg" id="arMsg" role="status"></span></p>
   <p class="hint" id="arHint"></p>
 </section>
+<section class="card" id="drCrews">
+  <h3>Забои в работе и проходческие бригады</h3>
+  <p class="hint">Отметьте забои, которые сейчас в работе, соберите их в бригады вручную и назначьте технику. Бригада обслуживает свои забои по кругу одним комплектом техники: по каждому забою выполняется одна заходка за круг. Циклы забоев берутся из паспорта и циклограммы ниже (автоматический расчёт), плечо ПДМ для гор. −402 берётся по чертежу для каждого забоя.</p>
+  <div class="row" id="crFaces" role="group" aria-label="Забои в работе"></div>
+  <details class="crbox" id="crFleetBox"><summary><b>Парк техники участка</b> <span class="fold-n" id="crFleetN"></span></summary><div class="scroll"><table id="crFleet"></table></div>
+    <p class="hint">Количество машин по умолчанию принято по допущению до данных шахты; сумма назначенных бригадам машин не должна превышать парк.</p></details>
+  <div id="crList" class="stack"></div>
+  <p class="row"><button class="btn primary" id="crAdd" type="button">Добавить бригаду</button><button class="btn" id="crRest" type="button">Собрать новую бригаду из свободных забоев</button><button class="btn" id="crReset" type="button">Сбросить бригады</button><span class="msg" id="crMsg" role="status"></span></p>
+  <div id="crOut"></div>
+</section>
 <section class="card" id="drPass">
   <h3>Паспорт проходки: сечение, заходка, крепление</h3>
   <div class="row">
@@ -79,6 +89,7 @@
 <script src="js/blocks.js"></script>
 <script src="js/drawings.js"></script>
 <script src="js/drive.js"></script>
+<script src="js/crews.js"></script>
 <script src="js/params-data.js"></script>
 <script src="js/engine.js"></script>
 <script src="js/local-api.js"></script>
