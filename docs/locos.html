@@ -23,6 +23,12 @@
 
 <section class="card" id="flowCard"></section>
 
+<section class="card" id="rockCard">
+  <h3>Породная смена: учёт породы в откатке</h3>
+  <label class="inline"><input type="checkbox" id="rockOn"> Породная смена включена (порода от проходки учитывается в откатке)</label>
+  <div id="rockBox"></div>
+</section>
+
 <section class="card" id="fleetCard">
   <h3>Системы разработки и парк электровозов</h3>
   <p class="hint">Две системы работают на общем путевом хозяйстве: <b>SLC</b> (прямая погрузка с АТУ, сопряжение С-20, один состав) и <b>GSC</b> (погрузка скреперными лебёдками с откаточных ортов №26, №27, №28, три независимых поста). План шахты — сумма планов систем. Роль каждого электровоза выбирается вручную: SLC, GSC, резерв, ремонт или уборка породы. Электровозы в резерве, ремонте и на породе рудную откатку не ведут.</p>
@@ -77,6 +83,9 @@
 </main>
 <script src="js/blocks.js"></script>
 <script src="js/drive.js"></script>
+<script src="js/plan480.js"></script>
+<script src="js/equipment.js"></script>
+<script src="js/rock.js"></script>
 <script src="js/params-data.js"></script>
 <script src="js/engine.js"></script>
 <script src="js/local-api.js"></script>

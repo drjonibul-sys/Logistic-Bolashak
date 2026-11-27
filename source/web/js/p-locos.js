@@ -121,14 +121,98 @@ async function showArms() {
   $('#armCard').innerHTML = h;
   const ref = await api('GET', '/api/reference');
   const cur = window.LG_DRIVE.current(ref.values);
+  const fl = cur ? window.LG_DRIVE.flows(ref.values, cur.a, cur.S.T_ss, sch, cur.arms) : null;
+  RK.need = fl ? { wagons: fl.wagons_all, trains: fl.trains_all, wagons_all: fl.wagons_all, trains_all: fl.trains_all } : null;
   $('#flowCard').innerHTML = '<h3>Породные составы от проходки в откатке −480</h3>' + (cur
-    ? flowHtml(window.LG_DRIVE.flows(ref.values, cur.a, cur.S.T_ss, sch, cur.arms), ref.values, cur.mode)
+    ? flowHtml(fl, ref.values, cur.mode)
     : '<p class="hint">Циклограмма проходки не задана: <a href="drive.html">страница «Проходка»</a>.</p>');
+}
+
+/* ---------- породная смена: включение, ручное назначение электровозов и пунктов погрузки и разгрузки ---------- */
+const RK = { st: null, P: null, need: null };
+function rockPoints() {
+  const kinds = { pocket: 'Карманы и камеры', dump: 'Разгрузка (КДРВ, рудоспуски)', junc: 'Сопряжения' };
+  const by = {};
+  window.LG_PLAN.BASE.forEach(n => { const k = kinds[n.kind] ? n.kind : 'other'; (by[k] = by[k] || []).push(n); });
+  return { by, kinds: Object.assign({ other: 'Прочие узлы' }, kinds) };
+}
+function rockLen(from, to) {
+  const a = window.LG_PLAN.BASE.find(n => n.id === from), b = window.LG_PLAN.BASE.find(n => n.id === to);
+  if (!a || !b) return 0;
+  return Math.hypot(a.x - b.x, a.y - b.y) * RK.P.d_k_dev;
+}
+function rockOpts(sel) {
+  const pts = rockPoints();
+  return '<option value="">— выберите —</option>' + Object.keys(pts.by).map(k => `<optgroup label="${esc(pts.kinds[k])}">` +
+    pts.by[k].map(n => `<option value="${esc(n.id)}"${n.id === sel ? ' selected' : ''}>${esc(n.name)}</option>`).join('') + '</optgroup>').join('');
+}
+function renderRock() {
+  if (!RK.st) return;
+  const st = RK.st, P = RK.P;
+  $('#rockOn').checked = st.on;
+  const tags = (() => { try { return window.LG_EQUIP.load(P.n_loco).filter(u => u.type === 'loco'); } catch (e) { return []; } })();
+  const locoName = i => 'Электровоз ' + (i + 1) + (tags[i] && tags[i].tag ? ' (хоз. № ' + tags[i].tag + ')' : '') + (FL.roles[i] ? ', роль: ' + ROLE_LABEL[FL.roles[i]] : '');
+  if (!st.on) {
+    $('#rockBox').innerHTML = '<div class="banner warn">Породная смена выключена: порода при перевозке не учитывается. Включите смену, чтобы учесть породные составы в откатке и назначить электровозы и пункты погрузки и разгрузки.</div>';
+    return;
+  }
+  const lengths = {}; st.rows.forEach(r => { lengths[r.id] = r.from && r.to ? rockLen(r.from, r.to) : 0; });
+  const sm = window.LG_ROCK.summary(P, st.rows, lengths, RK.need);
+  let h = '<p class="hint">Назначьте вручную электровоз, пункт погрузки породы, пункт разгрузки и число вагонов ВГ в составе. Длина пути считается по хорде между узлами плана × k<sub>изв</sub>, время рейса: t = t<sub>пост</sub> + n·(t<sub>подача</sub> + n<sub>ков</sub>·t<sub>ПДМ</sub>) + L/v<sub>г</sub> + t<sub>разгр</sub> + L/v<sub>п</sub>. Электровоз, назначенный на породу, получает роль «уборка породы».</p>';
+  h += '<div class="scroll"><table><thead><tr><th class="l">Электровоз</th><th class="l">Погрузка породы</th><th class="l">Разгрузка породы</th><th>Вагонов в составе</th><th>Путь, м</th><th>Рейс, мин</th><th>Рейсов за смену</th><th>Порода за смену, т</th><th></th></tr></thead><tbody>';
+  sm.res.forEach(x => {
+    const r = x.r;
+    h += `<tr data-r="${esc(r.id)}"><td class="l"><select data-f="loco" aria-label="Электровоз"><option value="">— выберите —</option>${FL.roles.map((_, i) => `<option value="${i}"${r.loco === i ? ' selected' : ''}>${esc(locoName(i))}</option>`).join('')}</select></td>` +
+      `<td class="l"><select data-f="from" aria-label="Погрузка породы">${rockOpts(r.from)}</select></td><td class="l"><select data-f="to" aria-label="Разгрузка породы">${rockOpts(r.to)}</select></td>` +
+      `<td><input type="number" data-f="n" min="1" max="30" step="1" value="${r.n}" aria-label="Вагонов в составе"></td><td>${fmt(lengths[r.id], 0)}</td><td>${fmt(x.t / 60, 1)}</td><td>${x.trips}</td><td>${fmt(x.tonnes, 0)}</td>` +
+      `<td><button class="btn" type="button" data-del="${esc(r.id)}" aria-label="Удалить назначение">×</button></td></tr>`;
+  });
+  h += '</tbody></table></div><div class="row"><button class="btn primary" id="rockAdd" type="button">Добавить назначение</button><span class="msg" id="rockMsg" role="status"></span></div>';
+  const need = RK.need;
+  if (need) {
+    const cov = sm.cover;
+    h += '<div class="tiles">' + tile(fmt(need.wagons_all || need.wagons, 0) + ' ваг.', `порода проходки за смену (${fmt(need.trains_all || need.trains, 1)} составов)`) + tile(fmt(sm.wagons, 0) + ' ваг.', 'вывозят назначенные электровозы', cov != null && cov >= 1 ? 'ok' : 'warn') +
+      tile(cov == null ? '—' : pct(cov), 'покрытие потребности', cov != null && cov >= 1 ? 'ok' : cov != null && cov >= 0.8 ? 'warn' : 'bad') + tile(sm.locos.length, 'электровозов на породе') + '</div>';
+    if (!st.rows.length) h += '<div class="banner warn">Породная смена включена, но электровозы и пункты погрузки и разгрузки не назначены: вывоз породы в расчёте имитации не моделируется.</div>';
+    else if (cov != null && cov < 1) h += `<div class="banner warn">Назначенных рейсов не хватает: вывозится ${pct(cov)} породы проходки.</div>`;
+  }
+  const bad = st.rows.filter(r => r.loco == null || !r.from || !r.to);
+  if (bad.length) h += '<div class="banner warn">В части назначений не выбран электровоз или пункт погрузки/разгрузки: такие строки дают 0 рейсов.</div>';
+  const dup = st.rows.map(r => r.loco).filter((v, i, a) => v != null && a.indexOf(v) !== i);
+  if (dup.length) h += '<div class="banner err">Один электровоз назначен в нескольких строках: рейсы складываются без учёта общего времени смены.</div>';
+  h += '<p class="hint">Имитация движения (страницы «Анимация», «Показатели») по-прежнему считает рудные составы; породные составы входят в баланс откатки выше и в этот расчёт назначений.</p>';
+  $('#rockBox').innerHTML = h;
+  $$('#rockBox tr[data-r]').forEach(tr => {
+    const r = st.rows.find(x => x.id === tr.dataset.r);
+    $$('[data-f]', tr).forEach(i => i.addEventListener('change', () => {
+      const f = i.dataset.f;
+      r[f] = f === 'loco' ? (i.value === '' ? null : +i.value) : f === 'n' ? Math.max(1, Math.min(30, Math.round(+i.value) || 9)) : i.value;
+      if (f === 'loco' && r.loco != null && FL.roles[r.loco] !== 'por') { FL.roles[r.loco] = 'por'; FL.dirty = true; renderRoles(); }
+      window.LG_ROCK.save(st); renderRock();
+    }));
+    $('[data-del]', tr).addEventListener('click', () => { st.rows = st.rows.filter(x => x !== r); window.LG_ROCK.save(st); renderRock(); });
+  });
+  $('#rockAdd').addEventListener('click', () => {
+    st.rows.push({ id: 'r' + Date.now().toString(36), loco: null, from: '', to: '', n: Math.round(P.d_n_vg) || 9 });
+    window.LG_ROCK.save(st); renderRock();
+  });
+}
+async function initRock() {
+  const ref = await api('GET', '/api/reference');
+  RK.P = ref.values; RK.st = window.LG_ROCK.load();
+  $('#rockOn').addEventListener('change', () => {
+    RK.st.on = $('#rockOn').checked; window.LG_ROCK.save(RK.st);
+    document.querySelectorAll('.banner.warn').forEach(b => { if (/Породная смена выключена/.test(b.textContent) && !b.closest('#rockCard') && !b.closest('#flowCard')) b.remove(); });
+    showArms().then(() => renderRock());
+  });
+  renderRock();
 }
 
 boot(async () => {
   await showArms();
   fleetShow(await api('GET', '/api/fleet'));
+  await initRock();
+  if (location.hash === '#rock') $('#rockCard').scrollIntoView();
   ['#planSlc', '#planGsc'].forEach(id => $(id).addEventListener('input', () => { FL.dirty = true; fleetSummary(); }));
   $('#btnLocoAdd').addEventListener('click', () => { if (FL.roles.length < 30) { FL.roles.push('SLC'); FL.dirty = true; renderRoles(); } });
   $('#btnLocoDel').addEventListener('click', () => { if (FL.roles.length > 1) { FL.roles.pop(); FL.dirty = true; renderRoles(); } });

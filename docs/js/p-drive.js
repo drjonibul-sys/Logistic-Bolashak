@@ -134,7 +134,7 @@ function renderCrews() {
       const reg = EQ.filter(u => EQP.typeOf(u.type).res === r.id);
       if (!reg.length) return `<label>${esc(r.name.split(' (')[0])}, шт. <input type="number" min="1" max="10" step="1" data-cu="${r.id}" value="${CR.unitsOf(c, r.id, null)}"></label>`;
       const sel = (c.tags && c.tags[r.id]) || [];
-      return `<fieldset class="eqset"><legend>${esc(r.name.split(' (')[0])} (по хоз. номерам)</legend>` + reg.map(u => `<label class="inline"><input type="checkbox" data-ct="${r.id}" data-uid="${esc(u.id)}"${sel.indexOf(u.id) >= 0 ? ' checked' : ''}> ${esc(EQP.label(u))} <span class="badge">${esc(EQP.STATUS.find(z => z.id === u.status).name)}</span></label>`).join('') + '</fieldset>';
+      return `<fieldset class="eqset"><legend>${esc(r.name.split(' (')[0])} (по хоз. номерам)</legend>` + reg.map(u => `<label class="inline"><input type="checkbox" data-ct="${r.id}" data-uid="${esc(u.id)}"${sel.indexOf(u.id) >= 0 ? ' checked' : ''}> ${esc(EQP.label(u))} </label><select class="s-in" data-cs="${esc(u.id)}" aria-label="Состояние: ${esc(EQP.label(u))}">${EQP.STATUS.map(z => `<option value="${z.id}"${z.id === u.status ? ' selected' : ''}>${esc(z.name)}</option>`).join('')}</select>`).join('') + '</fieldset>';
     }).join('') + '</div>';
     h += '<div class="row" role="group" aria-label="Забои бригады">' + (c.faces.length ? c.faces.map(f => `<span class="badge">${esc(faceName(f).replace(/^Забой: /, ''))}</span>`).join(' ') : '<span class="msg">Забои не назначены: выберите бригаду в таблице ниже.</span>') + '</div>';
     if (x.bound === 'blocked') h += `<div class="banner err">Нет исправной машины в состоянии «в работе»: ${esc(D.RES.find(r => r.id === x.blocked).name.split(' (')[0])}. Бригада не работает.</div>`;
@@ -170,6 +170,10 @@ function renderCrews() {
       c.tags = c.tags || {}; const a = c.tags[i.dataset.ct] || [];
       c.tags[i.dataset.ct] = i.checked ? a.concat(i.dataset.uid) : a.filter(x => x !== i.dataset.uid);
       saveCrews(); renderCrews();
+    }));
+    $$('[data-cs]', card).forEach(i => i.addEventListener('change', () => {
+      const u = EQ.find(x => x.id === i.dataset.cs); if (!u) return;
+      u.status = i.value; EQP.save(EQ); renderCrews();
     }));
     $$('[data-cu]', card).forEach(i => i.addEventListener('change', () => { c.units[i.dataset.cu] = Math.max(1, Math.round(+i.value || 1)); saveCrews(); renderCrews(); }));
     $('[data-cdel]', card).addEventListener('click', () => { CRS.crews = CRS.crews.filter(z => z !== c); saveCrews(); renderCrews(); });

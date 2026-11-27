@@ -380,16 +380,21 @@
   const TRUCK_VG = 8, TRUCK_VP = 12;   // км/ч, как в справочнике блоков (допущение)
   function massPerCycle(P, l) { return P.d_S * l * P.d_k_per * P.d_gamma; }
 
+  /* Породная смена включена? (ключ lg.rock; по умолчанию включена, как до версии 0.19) */
+  function rockOn() { try { const o = JSON.parse(localStorage.getItem('lg.rock')); return !(o && o.on === false); } catch (e) { return true; } }
+
   function flows(P, a, Tss, sch, arms) {
     const shiftT = (P.T_sm - P.t_to_start - P.t_to_end) * P.ktg_sg;
     const cps = (a.m > 0 ? 1 / a.m : shiftT / Tss) * P.d_n_face;  // заходок за смену по всем забоям: одна заходка на m смен цикла
     const Mc = a.M != null ? a.M : massPerCycle(P, a.l_zab);
     const Mshift = cps * Mc;                                     // т/смену, всего с проходки
-    const W = Mshift * P.d_share;                                // т/смену в откатку −480
+    const rockOff = !rockOn();                                   // породная смена выключена: порода в откатке −480 не учитывается
+    const W_all = Mshift * P.d_share;                            // т/смену, которые дала бы проходка
+    const W = rockOff ? 0 : W_all;                               // т/смену в откатку −480
     const mVg = P.d_V_vg * P.d_k_vg * P.d_gamma / P.d_kr;        // т в одном ВГ
     const wagons = W / mVg;
     const trains = wagons / P.d_n_vg;
-    const out = { shiftT, cps, Mc, Mshift, W, mVg, wagons, trains, route: P.d_route };
+    const out = { shiftT, cps, Mc, Mshift, W, mVg, wagons, trains, route: P.d_route, rock_off: rockOff, W_all, wagons_all: W_all / mVg, trains_all: W_all / mVg / P.d_n_vg };
     if (arms) {
       out.arms = arms; out.haul_L = armsHaulL(arms);
       if (P.d_route === 1 && out.haul_L > 0) {                 // породу на −402 возят самосвалами: рейс по плечу откатки
@@ -438,6 +443,6 @@
   const hm = s => { const t = Math.round(s / 60); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); };
   const hmMin = m => hm(m * 60);
 
-  return { OPS, ORDER, RES, GROUPS, SUP, PRESETS, FIELDS, QTY, C5Q, emptyPass, getPreset, resolve, geometry, norm, fu, formulas, allocate, buildPlan, auto, manual, manualFromPlan,
+  return { rockOn, OPS, ORDER, RES, GROUPS, SUP, PRESETS, FIELDS, QTY, C5Q, emptyPass, getPreset, resolve, geometry, norm, fu, formulas, allocate, buildPlan, auto, manual, manualFromPlan,
     summarize, armSensitivity, materials, massPerCycle, flows, current, armsStored, armsHaulL, ARMS_KEY, PASS_KEY, MAN_KEY, MODE_KEY, clock, hm, hmMin, MIN, H };
 }));

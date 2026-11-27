@@ -129,6 +129,13 @@ function boot(init) {
     if (S.mode === 'browser' && S.storage !== 'localStorage') {
       insertBanner('Браузер не разрешает постоянное хранилище для этой страницы: справочник, пароль и расчёт сохраняются только до закрытия вкладки.', 'warn');
     }
+    try {
+      const pg = document.body.dataset.page;
+      const off = (() => { try { const o = JSON.parse(localStorage.getItem('lg.rock')); return !!o && o.on === false; } catch (e) { return false; } })();
+      if (off && ['index', 'locos', 'kpi', 'calc', 'drive', 'scheme', 'animation', 'charts', 'trucks'].indexOf(pg) >= 0) {
+        insertBanner('Породная смена выключена: порода при перевозке не учитывается (породные составы не входят в откатку гор. −480). Включить: страница «Электровозы», блок «Породная смена».', 'warn');
+      }
+    } catch (e) { /* без предупреждения */ }
     try { await init(); } catch (e) { console.error(e); insertBanner(e.message, 'err'); }
   });
 }
@@ -274,8 +281,9 @@ function meterHtml(frac, lowIsBad) {
 
 /* Горная масса проходки в откатке гор. −480: таблица баланса (используется на страницах «Проходка», «Общий расчёт», «Электровозы»). */
 function flowHtml(f, P, mode) {
+  const rockWarn = f.rock_off ? `<div class="banner warn">Породная смена выключена: порода проходки (≈${fmt(f.W_all, 0)} т за смену, ${fmt(f.trains_all, 1)} породных составов) в откатке −480 не учитывается, ёмкость откатки и остаток на руду завышены. <a href="locos.html#rock">Включить породную смену</a></div>` : '';
   const row = (a, b, c) => `<tr><td class="l">${a}</td><td>${b}</td><td class="l note">${c}</td></tr>`;
-  let h = '<div class="scroll"><table><thead><tr><th class="l">Величина</th><th>Значение</th><th class="l">Формула и подстановка</th></tr></thead><tbody>' +
+  let h = rockWarn + '<div class="scroll"><table><thead><tr><th class="l">Величина</th><th>Значение</th><th class="l">Формула и подстановка</th></tr></thead><tbody>' +
     (f.arms ? row('Горизонт проходки', esc(f.arms.name || '—'), `плечо ПДМ ${fmt(f.arms.pdm_L, 0)} м; плечи откатки: ${f.arms.haul.length} уч., всего ${fmt(f.haul_L, 0)} м (${f.arms.mode === 'auto' ? 'по чертежам' : 'введено вручную'})`) : '') +
     (f.t_trip ? row('Рейс самосвала с породой', fmt(f.t_trip / 60, 1) + ' мин', `t_р = t_пос + L/v_г + t_разгр + L/v_п, L = ${fmt(f.haul_L, 0)} м, v = 8/12 км/ч`) +
       row('Рейсов и самосвало-часов за смену', fmt(f.trips, 1) + ' рейсов, ' + fmt(f.truck_h, 1) + ' ч', `n_р = Q_пр / (G·(1+δ)) = ${fmt(f.Mshift, 0)} / ${fmt(f.q_truck, 1)}`) : '') +

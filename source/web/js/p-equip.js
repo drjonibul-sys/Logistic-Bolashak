@@ -34,12 +34,12 @@ function renderEquip() {
     '<button class="btn primary" id="eqAdd" type="button">Добавить машину</button></div>';
   const rows = EQL.filter(u => (!EQ_FILTER.type || u.type === EQ_FILTER.type) && (!EQ_FILTER.status || u.status === EQ_FILTER.status));
   h += '<datalist id="eqPlaces">' + eqPlaces().map(p => `<option value="${esc(p)}">`).join('') + '</datalist>';
-  h += '<div class="scroll"><table class="eq"><thead><tr><th class="l">Хоз. №</th><th class="l">Тип</th><th class="l">Модель</th><th class="l">Состояние</th><th class="l">Рабочее место</th><th class="l">Процесс</th><th>Моточасы</th><th class="l">Следующее ТО</th><th class="l">Бригада</th><th class="l">Примечание</th><th></th></tr></thead><tbody>' +
+  h += '<div class="scroll"><table class="eq"><thead><tr><th class="l">Хоз. №</th><th class="l">Состояние</th><th class="l">Тип</th><th class="l">Модель</th><th class="l">Рабочее место</th><th class="l">Процесс</th><th>Моточасы</th><th class="l">Следующее ТО</th><th class="l">Бригада</th><th class="l">Примечание</th><th></th></tr></thead><tbody>' +
     rows.map(u => `<tr class="st-${u.status}" data-u="${esc(u.id)}">` +
       `<td class="l"><input class="tag-in" type="text" data-f="tag" maxlength="30" value="${esc(u.tag)}" placeholder="введите" aria-label="Хозяйственный номер"></td>` +
+      `<td class="l">${eqSel(EQ_API.STATUS, u.status, 'data-f="status" class="s-in" aria-label="Состояние"')}</td>` +
       `<td class="l">${eqSel(EQ_API.TYPES, u.type, 'data-f="type" class="s-in" aria-label="Тип"')}</td>` +
       `<td class="l"><input class="m-in" type="text" data-f="model" maxlength="60" value="${esc(u.model)}" aria-label="Модель"></td>` +
-      `<td class="l">${eqSel(EQ_API.STATUS, u.status, 'data-f="status" class="s-in" aria-label="Состояние"')}</td>` +
       `<td class="l"><input class="p-in" type="text" list="eqPlaces" data-f="place" maxlength="60" value="${esc(u.place)}" aria-label="Рабочее место"></td>` +
       `<td class="l">${eqSel(EQ_API.PROCESSES, u.process, 'data-f="process" class="s-in" aria-label="Процесс"')}</td>` +
       `<td><input class="tag-in" type="number" min="0" step="1" data-f="hours" value="${u.hours}" aria-label="Моточасы"></td>` +
@@ -48,7 +48,7 @@ function renderEquip() {
       `<td class="l"><input class="n-in" type="text" data-f="note" maxlength="100" value="${esc(u.note)}" aria-label="Примечание"></td>` +
       `<td><button class="btn" type="button" data-del="${esc(u.id)}" aria-label="Удалить машину">×</button></td></tr>`).join('') + '</tbody></table></div>';
   h += '<div class="row"><button class="btn" id="eqLocos" type="button">Передать состояния электровозов на страницу «Электровозы»</button><button class="btn danger" id="eqReset" type="button">Вернуть начальный реестр</button><span class="msg" id="eqMsg" role="status"></span></div>' +
-    '<p class="hint">Реестр хранится в этом браузере. Хоз. номера вводятся вручную: в начальном реестре они пустые. Для бригад на странице «Проходка» машины назначаются по хоз. номерам из этого реестра; в расчёт бригады входят только машины в состоянии «в работе». Электровозы в состоянии «ремонт» и «ТО» передаются как «ремонт», «резерв» как «резерв»; число электровозов GSC сохраняется.</p>';
+    '<p class="hint">Состояние каждой машины выбирается вручную из выпадающего списка (в работе, ремонт, ТО, резерв); оно же доступно в карточке бригады на странице «Проходка». Реестр хранится в этом браузере. Хоз. номера вводятся вручную: в начальном реестре они пустые. Для бригад на странице «Проходка» машины назначаются по хоз. номерам из этого реестра; в расчёт бригады входят только машины в состоянии «в работе». Электровозы в состоянии «ремонт» и «ТО» передаются как «ремонт», «резерв» как «резерв»; число электровозов GSC сохраняется.</p>';
   $('#eqOut').innerHTML = h;
   $('#eqFT').addEventListener('input', e => { EQ_FILTER.type = e.target.value; renderEquip(); });
   $('#eqFS').addEventListener('input', e => { EQ_FILTER.status = e.target.value; renderEquip(); });

@@ -138,6 +138,22 @@ try:
         pg.wait_for_selector('#trkBox .tiles')
         check('самосвалы: плитки и разделы', pg.locator('#trkBox > .tiles .tile').count() == 5 and pg.locator('#trkBox section').count() >= 7 and 'Породная смена' in pg.inner_text('#trkBox'))
 
+        # --- породная смена: выключение, предупреждение, ручное назначение
+        go('/locos.html')
+        pg.wait_for_selector('#rockCard #rockAdd')
+        pg.click('#rockAdd')
+        pg.select_option('#rockBox tr[data-r] [data-f="loco"]', index=1)
+        check('порода: электровоз назначен вручную', pg.locator('#rockBox tr[data-r]').count() == 1)
+        pg.select_option('#rockBox tr[data-r] [data-f="from"]', 'c16')
+        pg.select_option('#rockBox tr[data-r] [data-f="to"]', 'kdrv2')
+        check('порода: рейсы считаются по назначению', float(pg.locator('#rockBox tr[data-r] td').nth(6).inner_text().replace(' ', '') or 0) >= 0 and pg.locator('#rockBox .tile').count() == 4)
+        pg.uncheck('#rockOn')
+        pg.wait_for_function("() => document.querySelector('#flowCard').innerText.includes('не учитывается')")
+        check('порода: при выключении предупреждение', 'не учитывается' in pg.inner_text('#rockBox') and 'не учитывается' in pg.inner_text('#flowCard'))
+        go('/kpi.html')
+        pg.wait_for_selector('.banner.warn')
+        check('порода: предупреждение на других страницах', pg.locator('.banner.warn', has_text='Породная смена выключена').count() >= 1)
+        pg.evaluate("localStorage.removeItem('lg.rock')")
         # --- справочник «Техника»: хоз. номера, состояния, назначение бригаде
         go('/reference.html')
         pg.wait_for_selector('#eqOut table.eq', state='attached')

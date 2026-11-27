@@ -705,3 +705,26 @@ test('техника: реестр, сводка, роли электровоз�
   const r = CR.crew(c, faces, list);
   assert.equal(r.bound, 'blocked'); assert.equal(r.per_day, 0);
 });
+
+/* ---------- породная смена (версия 0.19.0) ---------- */
+test('породная смена: выключение обнуляет породу в откатке, рейсы по назначениям', () => {
+  const RK = require(path.join(__dirname, '..', 'static', 'js', 'rock.js'));
+  const DV = require(path.join(__dirname, '..', 'static', 'js', 'drive.js'));
+  const a = DV.auto(D, DV.emptyPass(), 350), S = DV.summarize(a, 86400, D);
+  const sch = LG.scheme(D);
+  const on = DV.flows(D, a, S.T_ss, sch, null);
+  assert.equal(on.rock_off, false); assert.ok(on.trains > 0);
+  global.localStorage = { getItem: () => JSON.stringify({ on: false }) };
+  const off = DV.flows(D, a, S.T_ss, sch, null);
+  delete global.localStorage;
+  assert.equal(off.rock_off, true); assert.equal(off.trains, 0); assert.equal(off.W, 0);
+  near(off.trains_all, on.trains, 1e-9, 'потребность породы сохраняется для справки');
+  assert.ok(off.free_trains > on.free_trains, 'без породы остаётся больше ёмкости на руду');
+  // рейсы: дальше путь — меньше рейсов
+  const t1 = RK.trip(D, 500, 9), t2 = RK.trip(D, 3000, 9);
+  assert.ok(t2.t > t1.t && t2.trips <= t1.trips);
+  const sm = RK.summary(D, [{ id: 'a', loco: 0, from: 'x', to: 'y', n: 9 }, { id: 'b', loco: 0, from: 'x', to: 'y', n: 9 }], { a: 800, b: 800 }, { wagons: 50 });
+  assert.deepEqual(sm.locos, [0]); near(sm.cover, sm.wagons / 50, 1e-9, 'покрытие');
+  assert.equal(RK.clean({ on: false, rows: [{ loco: -1, n: 99 }] }).rows[0].loco, null);
+  assert.equal(RK.clean(null).on, true);
+});

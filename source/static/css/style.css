@@ -266,3 +266,5 @@ td input.d-in { width: 140px; }
 td input.n-in { width: 160px; }
 tr.st-repair td, tr.st-to td { background: var(--warn-bg); }
 tr.st-reserve td { opacity: .8; }
+fieldset.eqset label.inline { flex-wrap: wrap; }
+fieldset.eqset select.s-in { margin: 0 0 4px 22px; max-width: 170px; }
