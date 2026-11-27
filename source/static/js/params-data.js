@@ -1,6 +1,6 @@
 'use strict';
 /* Создан tools/gen_params_js.py из sim/params.py, не править вручную. */
-var LG_VERSION = "0.17.0";
+var LG_VERSION = "0.18.0";
 var LG_GROUPS = [
  {
   "title": "Локомотивы и составы (Ferrit LF120, ВДР-5,3)",

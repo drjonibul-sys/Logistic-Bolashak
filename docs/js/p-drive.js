@@ -85,8 +85,8 @@ function bindArms() {
 
 
 /* ---------- забои в работе и бригады ---------- */
-const CR = window.LG_CREWS;
-let CRS = null;
+const CR = window.LG_CREWS, EQP = window.LG_EQUIP;
+let CRS = null, EQ = [];
 function saveCrews() { save(CR.KEY, CRS); }
 function loadCrews() { try { return CR.clean(JSON.parse(localStorage.getItem(CR.KEY))); } catch (e) { return CR.clean(null); } }
 const crFaces = () => DR.nodes(ARMS.auto.hid).filter(n => n.face);
@@ -116,10 +116,12 @@ function crewOpts(cur, f) {
 function renderCrews() {
   if (!CRS) return;
   CRS = CR.clean(CRS);
-  const faces = crFaces(), FC = faceCalcs(), sm = CR.summary(CRS, FC);
+  EQ = EQP.load(P.n_loco);
+  const faces = crFaces(), FC = faceCalcs(), sm = CR.summary(CRS, FC, EQ);
   $('#crFaces').innerHTML = faces.map(n => `<label class="inline"><input type="checkbox" data-w="${esc(n.id)}"${CRS.working[n.id] ? ' checked' : ''}> ${esc(n.name.replace(/^Забой: /, ''))}</label>`).join('');
-  const fl = D.RES.map(r => `<tr><td class="l">${esc(r.name)}</td><td><input type="number" min="0" max="20" step="1" data-fl="${r.id}" value="${CRS.fleet[r.id]}" aria-label="Парк: ${esc(r.name)}"></td><td>${sm.used[r.id]}</td></tr>`).join('');
-  $('#crFleet').innerHTML = '<thead><tr><th class="l">Машина</th><th>В парке, шт.</th><th>Назначено бригадам, шт.</th></tr></thead><tbody>' + fl + '</tbody>';
+  const regN = r => EQ.filter(u => EQP.typeOf(u.type).res === r).length;
+  const fl = D.RES.map(r => `<tr><td class="l">${esc(r.name)}</td><td>${regN(r.id) ? fmt(sm.avail[r.id], 0) + ' <span class="badge">справочник «Техника»</span>' : `<input type="number" min="0" max="20" step="1" data-fl="${r.id}" value="${CRS.fleet[r.id]}" aria-label="Парк: ${esc(r.name)}">`}</td><td>${sm.used[r.id]}</td></tr>`).join('');
+  $('#crFleet').innerHTML = '<thead><tr><th class="l">Машина</th><th>В работе, шт.</th><th>Назначено бригадам, шт.</th></tr></thead><tbody>' + fl + '</tbody>';
   $('#crFleetN').textContent = sm.over.length ? 'превышение парка: ' + sm.over.map(id => D.RES.find(r => r.id === id).name.split(' (')[0]).join(', ') : '';
   let h = '';
   CRS.crews.forEach((c, ci) => {
@@ -128,9 +130,15 @@ function renderCrews() {
       `<label>Численность, чел. <input type="number" data-cf="people" min="0" max="60" step="1" value="${c.people}"></label>` +
       `<label>Перегон техники между забоями, мин <input type="number" data-cf="t_move" min="0" max="480" step="5" value="${c.t_move}"></label>` +
       `<button class="btn danger" type="button" data-cdel="${c.id}">Удалить бригаду</button></div>`;
-    h += '<div class="row">' + D.RES.map(r => `<label>${esc(r.name.split(' (')[0])}, шт. <input type="number" min="1" max="10" step="1" data-cu="${r.id}" value="${CR.unitsOf(c, r.id)}"></label>`).join('') + '</div>';
+    h += '<div class="row">' + D.RES.map(r => {
+      const reg = EQ.filter(u => EQP.typeOf(u.type).res === r.id);
+      if (!reg.length) return `<label>${esc(r.name.split(' (')[0])}, шт. <input type="number" min="1" max="10" step="1" data-cu="${r.id}" value="${CR.unitsOf(c, r.id, null)}"></label>`;
+      const sel = (c.tags && c.tags[r.id]) || [];
+      return `<fieldset class="eqset"><legend>${esc(r.name.split(' (')[0])} (по хоз. номерам)</legend>` + reg.map(u => `<label class="inline"><input type="checkbox" data-ct="${r.id}" data-uid="${esc(u.id)}"${sel.indexOf(u.id) >= 0 ? ' checked' : ''}> ${esc(EQP.label(u))} <span class="badge">${esc(EQP.STATUS.find(z => z.id === u.status).name)}</span></label>`).join('') + '</fieldset>';
+    }).join('') + '</div>';
     h += '<div class="row" role="group" aria-label="Забои бригады">' + (c.faces.length ? c.faces.map(f => `<span class="badge">${esc(faceName(f).replace(/^Забой: /, ''))}</span>`).join(' ') : '<span class="msg">Забои не назначены: выберите бригаду в таблице ниже.</span>') + '</div>';
-    if (x.k) {
+    if (x.bound === 'blocked') h += `<div class="banner err">Нет исправной машины в состоянии «в работе»: ${esc(D.RES.find(r => r.id === x.blocked).name.split(' (')[0])}. Бригада не работает.</div>`;
+    else if (x.k) {
       const bn = x.bound === 'tech' ? 'технология забоя (цикл)' : D.RES.find(r => r.id === x.bound).name.split(' (')[0];
       h += `<div class="tiles">${T(fmt(x.T_round / 60, 1) + ' ч', 'круг обслуживания забоев', 'ok')}${T(fmt(x.cycles_day, 2), 'заходок в сутки на забой')}${T(fmt(x.per_day, 2) + ' м', 'проходка бригады в сутки')}${T(fmt(30 * x.per_day, 0) + ' м', 'за месяц (30 суток)')}${T(fmt(x.M_day, 0) + ' т', 'горная масса в сутки')}</div>`;
       h += `<p class="hint">Лимит круга: ${esc(bn)}. T_кр = max(${fmt(x.T_tech / 60, 1)} ч цикл забоя; ${fmt(x.T_mach / 60, 1)} ч занятость техники) + ${x.k > 1 ? x.k + ' × ' + c.t_move + ' мин перегона' : '0 мин'} = ${fmt(x.T_round / 60, 1)} ч.</p>`;
@@ -141,7 +149,9 @@ function renderCrews() {
   /* таблица назначения: ручная группировка забоев в работе */
   const w = Object.keys(FC);
   let t = '<h3>Назначение забоев бригадам</h3>' + (sm.free.length ? `<div class="banner warn">Забои без бригады: ${sm.free.map(f => esc(faceName(f).replace(/^Забой: /, ''))).join(', ')}.</div>` : '') +
-    (sm.over.length ? '<div class="banner err">Назначено техники больше, чем в парке: увеличьте парк или уменьшите число машин у бригад.</div>' : '');
+    (sm.over.length ? '<div class="banner err">Назначено техники больше, чем в работе: измените состояние машин в справочнике «Техника» или число машин у бригад.</div>' : '') +
+    (sm.twice.length ? `<div class="banner err">Одна машина назначена в две бригады: ${sm.twice.map(id => esc(EQP.label(EQ.find(u => u.id === id)))).join('; ')}.</div>` : '') +
+    (sm.idle.length ? `<div class="banner warn">Назначены машины не в состоянии «в работе»: ${sm.idle.map(id => { const u = EQ.find(z => z.id === id); return esc(EQP.label(u) + ' (' + EQP.STATUS.find(z => z.id === u.status).name + ')'); }).join('; ')}.</div>` : '');
   if (!w.length) t += '<p class="msg">Забои в работе не отмечены.</p>';
   else {
     t += '<div class="scroll"><table><thead><tr><th class="l">Забой в работе</th><th>Плечо ПДМ, м</th><th>Цикл, ч</th><th>Заходка, м</th><th class="l">Бригада</th></tr></thead><tbody>' +
@@ -156,6 +166,11 @@ function renderCrews() {
   $$('#crList [data-crew]').forEach(card => {
     const c = CRS.crews.find(z => z.id === +card.dataset.crew);
     $$('[data-cf]', card).forEach(i => i.addEventListener('change', () => { c[i.dataset.cf] = i.dataset.cf === 'name' ? (i.value.trim() || c.name) : +i.value; saveCrews(); renderCrews(); }));
+    $$('[data-ct]', card).forEach(i => i.addEventListener('change', () => {
+      c.tags = c.tags || {}; const a = c.tags[i.dataset.ct] || [];
+      c.tags[i.dataset.ct] = i.checked ? a.concat(i.dataset.uid) : a.filter(x => x !== i.dataset.uid);
+      saveCrews(); renderCrews();
+    }));
     $$('[data-cu]', card).forEach(i => i.addEventListener('change', () => { c.units[i.dataset.cu] = Math.max(1, Math.round(+i.value || 1)); saveCrews(); renderCrews(); }));
     $('[data-cdel]', card).addEventListener('click', () => { CRS.crews = CRS.crews.filter(z => z !== c); saveCrews(); renderCrews(); });
   });
@@ -170,7 +185,7 @@ function bindCrews() {
   CRS = loadCrews();
   $('#crAdd').addEventListener('click', () => { CRS.crews.push({ id: CRS.next++, name: 'Бригада ' + (CRS.crews.length + 1), people: 12, t_move: 20, units: {}, faces: [] }); saveCrews(); renderCrews(); setMsg($('#crMsg'), 'Бригада добавлена: назначьте забои в таблице ниже.', 'ok'); });
   $('#crRest').addEventListener('click', () => {
-    const sm = CR.summary(CRS, faceCalcs());
+    const sm = CR.summary(CRS, faceCalcs(), EQ);
     if (!sm.free.length) { setMsg($('#crMsg'), 'Свободных забоев нет.', 'err'); return; }
     CRS.crews.push({ id: CRS.next++, name: 'Бригада ' + (CRS.crews.length + 1), people: 12, t_move: 20, units: {}, faces: sm.free.slice() });
     saveCrews(); renderCrews(); setMsg($('#crMsg'), 'Свободные забои собраны в новую бригаду.', 'ok');

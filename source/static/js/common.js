@@ -42,7 +42,7 @@ const PAGES = [
   ] },
   { group: 'Данные', items: [
     { id: 'scheme', href: 'scheme.html', title: 'Схема', desc: 'Маршрут, блок-участки, разминовки, пропускная способность звеньев' },
-    { id: 'reference', href: 'reference.html', title: 'Справочник', desc: 'Параметры модели с источниками, правят все пользователи; суточное планирование' },
+    { id: 'reference', href: 'reference.html', title: 'Справочник', desc: 'Параметры модели с источниками, правят все пользователи; суточное планирование; техника по хоз. номерам' },
     { id: 'import', href: 'import.html', title: 'Импорт', admin: true, desc: 'Топология из DXF и справочники из Excel (версия 0.2)' },
   ] },
   { group: 'Система', items: [

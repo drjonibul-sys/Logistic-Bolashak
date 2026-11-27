@@ -24,7 +24,7 @@ INJECT = ('<script src="js/params-data.js"></script>\n'
           '<script src="js/updater.js"></script>\n')
 MARK = '<script src="js/common.js"></script>'
 PAGES = ["index", "calc", "trucks", "drive", "drive480", "scraper", "mining", "locos", "calcs", "nodes", "animation", "kpi", "charts", "scheme", "reference", "import", "admin", "settings", "updates", "update-source", "help"]
-JS_FILES = ["params-data.js", "blocks.js", "drawings.js", "drive.js", "crews.js", "drive480.js", "scraper.js", "mining.js", "dayplan.js", "plan480.js", "engine.js", "local-api.js", "common.js", "draw.js", "pwa.js", "zip.js", "updater.js"] + [f"p-{p}.js" for p in PAGES] + ["p-dayplan.js"]
+JS_FILES = ["params-data.js", "blocks.js", "drawings.js", "drive.js", "equipment.js", "crews.js", "drive480.js", "scraper.js", "mining.js", "dayplan.js", "plan480.js", "engine.js", "local-api.js", "common.js", "draw.js", "pwa.js", "zip.js", "updater.js"] + [f"p-{p}.js" for p in PAGES] + ["p-dayplan.js", "p-equip.js"]
 
 
 def read(path):

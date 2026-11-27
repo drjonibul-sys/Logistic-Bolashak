@@ -675,3 +675,33 @@ test('бригады: один забой совпадает с циклом з�
   const cl = CR.clean({ working: { A: 1 }, crews: [{ id: 1, faces: ['A', 'B'] }, { id: 2, faces: ['A'] }] });
   assert.deepEqual(cl.crews[0].faces, ['A']); assert.deepEqual(cl.crews[1].faces, []);
 });
+
+/* ---------- справочник «Техника» и назначение машин бригадам (версия 0.18.0) ---------- */
+test('техника: реестр, сводка, роли электровозов, назначение машин бригадам по хоз. номерам', () => {
+  const EQ = require(path.join(__dirname, '..', 'static', 'js', 'equipment.js'));
+  const CR = require(path.join(__dirname, '..', 'static', 'js', 'crews.js'));
+  const DV = require(path.join(__dirname, '..', 'static', 'js', 'drive.js'));
+  const list = EQ.clean(null, 7);
+  assert.equal(list.filter(u => u.type === 'loco').length, 7);
+  assert.equal(EQ.stats(list).noTag, list.length, 'хоз. номера не придуманы');
+  list.filter(u => u.type === 'loco').forEach((u, i) => { u.tag = 'Э-' + (i + 1); });
+  list[0].status = 'repair'; list[1].status = 'to'; list[2].status = 'reserve';
+  assert.deepEqual(EQ.locoRoles(list, 2).sort(), ['GSC', 'GSC', 'SLC', 'rem', 'rem', 'rez', 'SLC'].sort());
+  list[3].tag = 'Э-5';
+  assert.deepEqual(EQ.stats(list).dup, ['Э-5']);
+  // назначение: машина в ремонте не считается, нет исправной машины — бригада блокирована
+  const a = DV.auto(D, DV.emptyPass(), 350), S = DV.summarize(a, 86400, D), fc = CR.faceCycle(D, a, S);
+  const faces = { A: fc };
+  const bo = list.filter(u => u.type === 'boomer');
+  bo[0].tag = 'Б-1'; bo[1].tag = 'Б-2';
+  const c = { id: 1, name: 'x', people: 1, t_move: 0, units: {}, faces: ['A'], tags: { boomer: [bo[0].id, bo[1].id] } };
+  assert.equal(CR.unitsOf(c, 'boomer', list), 2);
+  bo[1].status = 'repair';
+  assert.equal(CR.unitsOf(c, 'boomer', list), 1);
+  const st = CR.clean({ working: { A: 1 }, crews: [c, Object.assign({}, c, { id: 2, faces: [], tags: { boomer: [bo[0].id] } })] });
+  const sm = CR.summary(st, faces, list);
+  assert.deepEqual(sm.idle, [bo[1].id]); assert.deepEqual(sm.twice, [bo[0].id]);
+  bo[0].status = 'to';
+  const r = CR.crew(c, faces, list);
+  assert.equal(r.bound, 'blocked'); assert.equal(r.per_day, 0);
+});

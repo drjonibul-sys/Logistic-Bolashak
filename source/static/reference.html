@@ -13,6 +13,7 @@
 <div class="tabs" role="tablist" aria-label="Разделы справочника">
   <button type="button" class="tab on" role="tab" id="tabBtnParams" aria-selected="true" aria-controls="tabParams">Параметры</button>
   <button type="button" class="tab" role="tab" id="tabBtnDay" aria-selected="false" aria-controls="tabDay">Суточное планирование</button>
+  <button type="button" class="tab" role="tab" id="tabBtnEquip" aria-selected="false" aria-controls="tabEquip">Техника</button>
 </div>
 <div id="tabParams" role="tabpanel">
 <p class="lead" id="refHint"></p>
@@ -37,13 +38,19 @@
   <p class="lead">Плановые показатели добычи руды и отгрузки породы вносятся вручную. Для каждой строки выбираются начало маршрута (точка отгрузки) и конец маршрута (точка разгрузки); плечо откатки рассчитывается автоматически по чертежам и справочнику блоков, при необходимости его можно задать вручную.</p>
   <div id="dayOut"></div>
 </div>
+<div id="tabEquip" role="tabpanel" hidden>
+  <p class="lead">Реестр техники по хозяйственным номерам: состояние (в работе, ремонт, ТО, резерв), рабочее место, процесс, моточасы и дата ТО. Машины из реестра назначаются бригадам на странице «Проходка».</p>
+  <div id="eqOut"></div>
+</div>
 </main>
 <script src="js/blocks.js"></script>
 <script src="js/drawings.js"></script>
 <script src="js/plan480.js"></script>
 <script src="js/dayplan.js"></script>
+<script src="js/equipment.js"></script>
 <script src="js/common.js"></script>
 <script src="js/p-dayplan.js"></script>
+<script src="js/p-equip.js"></script>
 <script src="js/p-reference.js"></script>
 </body>
 </html>

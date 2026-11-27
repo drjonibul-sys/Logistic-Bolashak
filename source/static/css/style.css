@@ -254,3 +254,15 @@ button.fold-col { margin: 4px 0; font-size: 13px; }
 .roles { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; margin: 12px 0; }
 .roles label { display: flex; flex-direction: column; gap: 3px; font-size: 13px; color: var(--muted); }
 .roles select { min-height: 36px; }
+
+/* бригады и техника */
+fieldset.eqset { border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; margin: 0; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+fieldset.eqset legend { font-size: 12.5px; color: var(--muted); padding: 0 4px; }
+td input.tag-in { width: 110px; }
+td input.m-in { width: 150px; }
+td select.s-in { max-width: 170px; }
+td input.p-in { width: 150px; }
+td input.d-in { width: 140px; }
+td input.n-in { width: 160px; }
+tr.st-repair td, tr.st-to td { background: var(--warn-bg); }
+tr.st-reserve td { opacity: .8; }

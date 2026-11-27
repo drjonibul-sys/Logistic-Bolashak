@@ -108,6 +108,7 @@ boot(async () => {
   ['#refFind', '#refChanged', '#refAssume'].forEach(s => $(s).addEventListener('input', applyFilter));
   $('#btnRefSave').addEventListener('click', saveRef);
   $('#btnRefReset').addEventListener('click', resetRef);
+  if (typeof initEquip === 'function') initEquip();
   initTabs();
   await initDayPlan();
   window.addEventListener('beforeunload', ev => {

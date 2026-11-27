@@ -9,15 +9,18 @@ const dsave = () => { try { localStorage.setItem(DY.KEY, JSON.stringify(DDOC)); 
 const dsb = t => t.replace(/_([^\s;,)=·/]+)/g, '<sub>$1</sub>');
 
 function initTabs() {
-  const set = day => {
-    $('#tabParams').hidden = day; $('#tabDay').hidden = !day;
-    $('#tabBtnParams').classList.toggle('on', !day); $('#tabBtnDay').classList.toggle('on', day);
-    $('#tabBtnParams').setAttribute('aria-selected', String(!day)); $('#tabBtnDay').setAttribute('aria-selected', String(day));
-    if (day && DP) renderDay();
+  const tabs = [['Params', 'tabParams'], ['Day', 'tabDay'], ['Equip', 'tabEquip']].filter(t => document.getElementById('tabBtn' + t[0]));
+  const set = name => {
+    tabs.forEach(t => {
+      const on = t[0] === name;
+      $('#' + t[1]).hidden = !on; $('#tabBtn' + t[0]).classList.toggle('on', on); $('#tabBtn' + t[0]).setAttribute('aria-selected', String(on));
+    });
+    if (name === 'Day' && DP) renderDay();
+    if (name === 'Equip' && typeof renderEquip === 'function') renderEquip();
   };
-  $('#tabBtnParams').addEventListener('click', () => set(false));
-  $('#tabBtnDay').addEventListener('click', () => set(true));
-  if (location.hash === '#day') set(true);
+  tabs.forEach(t => $('#tabBtn' + t[0]).addEventListener('click', () => set(t[0])));
+  if (location.hash === '#day') set('Day');
+  if (location.hash === '#equip') set('Equip');
 }
 
 function opts(list, sel, ph) {
